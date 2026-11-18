@@ -1,0 +1,24 @@
+name: check
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@v23
+        with:
+          extra-conf: |
+            log-lines = 1000
+      - run: nix flake check --show-trace --no-build
