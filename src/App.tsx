@@ -13,7 +13,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/com
 import { toast } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { config } from "@/lib/config";
-import { type Session, signOut } from "@/lib/connection";
+import type { Session } from "@/lib/connection";
 import { openThread, usePage } from "@/lib/route";
 import { errorMessage } from "@/lib/utils";
 import type { Startup } from "@/start";
@@ -47,24 +47,16 @@ function App({ startup }: { startup: Startup }) {
       {session === undefined ? (
         <Login error={startup.error} onSignIn={setSession} />
       ) : (
-        <Workspace
-          session={session}
-          onSignOut={() => void signOut().then(() => setSession(undefined))}
-        />
+        <Workspace session={session} />
       )}
     </>
   );
 }
 
-interface WorkspaceProps {
-  session: Session;
-  onSignOut: () => void;
-}
-
 // whether the docked sidebar is open, the overlay on small screens always starts closed
 const sidebarKey = "bearchat:sidebar";
 
-function Workspace({ session, onSignOut }: WorkspaceProps) {
+function Workspace({ session }: { session: Session }) {
   const { route, thread } = usePage();
   const [sidebarOpen, setSidebarOpen] = useState(
     () => localStorage.getItem(sidebarKey) !== "false",
@@ -79,7 +71,7 @@ function Workspace({ session, onSignOut }: WorkspaceProps) {
       }}
       className="h-(--viewport-height) min-h-0"
     >
-      <AppSidebar onSignOut={onSignOut} />
+      <AppSidebar />
       <SidebarInset className="min-h-0 min-w-0 px-safe-0">
         <Header />
         <Thread key={route.id} route={route} thread={thread} session={session} />

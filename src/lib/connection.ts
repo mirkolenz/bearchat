@@ -160,6 +160,10 @@ export async function signOut(): Promise<void> {
   sessionStorage.removeItem(credentialsKey);
 
   if (config.auth === "cookie") {
-    await fetch(logoutPath, { method: "POST" });
+    const response = await fetch(logoutPath, { method: "POST" });
+
+    if (!response.ok) {
+      throw new Error(`Signing out failed with status ${response.status}`);
+    }
   }
 }

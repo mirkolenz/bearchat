@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { clearFiles } from "@/lib/files";
+import { errorMessage } from "@/lib/utils";
 
 // Keys of localStorage and sessionStorage, such as the settings and the token, share this namespace.
 const keyPrefix = "bearchat:";
@@ -21,12 +22,17 @@ export async function resetApp(): Promise<void> {
     db.delete(),
     clearFiles(),
     // ends the proxy's session in cookie mode, which is skipped when the config is unusable
-    import("@/lib/connection").then(({ signOut }) => signOut()).catch(() => undefined),
+    import("@/lib/connection").then(
+      ({ signOut }) => signOut(),
+      () => undefined,
+    ),
   ]);
-  const errors = results.filter((result) => result.status === "rejected").map((result) => result.reason);
+  const errors = results
+    .filter((result) => result.status === "rejected")
+    .map((result) => result.reason);
 
   if (errors.length > 0) {
-    throw new AggregateError(errors, "Some data could not be deleted");
+    throw new AggregateError(errors, errors.map(errorMessage).join("\n"));
   }
 
   // a fresh start, which also drops everything held in memory

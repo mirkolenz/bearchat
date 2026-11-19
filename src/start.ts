@@ -16,8 +16,6 @@ export async function start(): Promise<Startup> {
     resumeSession(),
     startRouting(),
     watchThreads(),
-    // Temporal for browsers without native support, before the app renders and uses it
-    "Temporal" in globalThis || import("temporal-polyfill/global"),
   ]);
 
   // only a chat with messages waits for the renderer

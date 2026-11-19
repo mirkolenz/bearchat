@@ -25,7 +25,7 @@ export const lockedSettings: ReadonlySet<SettingKey> = new Set(
   settingsSchema.keyof().options.filter((key) => config.locked[key] !== undefined),
 );
 
-// User and chat values that no longer validate fall back to the lower layers field by field.
+// User and chat values that no longer validate fall back to the deployment or built-in value field by field.
 const resolvedSchema = z.object({
   model: settingsSchema.shape.model.optional().catch(base.model),
   reasoning: settingsSchema.shape.reasoning.catch(base.reasoning),
@@ -46,7 +46,7 @@ export type ChatSettings = z.infer<typeof chatSettingsSchema>;
 type UserLayer = Record<string, unknown>;
 
 export function resolveSettings(user: UserLayer, chat: ChatSettings = {}): Settings {
-  return resolvedSchema.parse({ ...user, ...chat, ...config.locked });
+  return resolvedSchema.parse({ ...base, ...user, ...chat, ...config.locked });
 }
 
 // Only the user's changes are stored, so later deployment or built-in changes still apply.

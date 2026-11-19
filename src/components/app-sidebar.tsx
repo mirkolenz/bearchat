@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/sidebar";
 import { toMarkdown } from "@/lib/chat";
 import { config } from "@/lib/config";
+import { signOut } from "@/lib/connection";
 import { deleteThread, loadThread, updateThread, useThreads } from "@/lib/threads";
 import { openTemporaryThread, openThread, useTargetId } from "@/lib/route";
 import { downloadFile } from "@/lib/utils";
@@ -48,7 +49,7 @@ import { downloadFile } from "@/lib/utils";
 // shortcuts use ⌘ on Apple devices and Ctrl elsewhere
 const modifier = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
 
-export function AppSidebar({ onSignOut }: { onSignOut: () => void }) {
+export function AppSidebar() {
   // loaded before the first render, so the list never shows placeholders on startup
   const threads = useThreads();
   const activeId = useTargetId();
@@ -164,7 +165,7 @@ export function AppSidebar({ onSignOut }: { onSignOut: () => void }) {
         </TabsContent>
       </Tabs>
       <SidebarFooter className="pb-safe-2 pl-safe-2">
-        <SettingsMenu onSignOut={onSignOut} />
+        <SettingsMenu />
       </SidebarFooter>
     </Sidebar>
   );
@@ -259,7 +260,7 @@ function RenameDialog({ id, title: initial, onClose }: RenameDialogProps) {
   );
 }
 
-function SettingsMenu({ onSignOut }: { onSignOut: () => void }) {
+function SettingsMenu() {
   const [editing, setEditing] = useState(false);
 
   return (
@@ -272,7 +273,8 @@ function SettingsMenu({ onSignOut }: { onSignOut: () => void }) {
         {editing && <SettingsDialog onClose={() => setEditing(false)} />}
       </SidebarMenuItem>
       <SidebarMenuItem>
-        <SidebarMenuButton onClick={onSignOut}>
+        {/* a fresh start, so that nothing of the session stays in memory, such as the shown chat */}
+        <SidebarMenuButton onClick={() => void signOut().then(() => location.reload())}>
           <LogOutIcon />
           Sign out
         </SidebarMenuButton>
