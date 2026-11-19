@@ -28,12 +28,16 @@ interface ToolListing {
 // Tool lists are cached for as long as the server's ttlMs hint allows, or for the client's lifetime without one.
 const toolListings = new Map<string, Promise<ToolListing>>();
 const ttlSchema = z.int().nonnegative();
+// bounds connecting and listing, so that a server that never answers cannot stall every request
+const requestOptions = { timeout: 10_000 };
 
 async function connect(url: string): Promise<MCPClient> {
   const client = await createMCPClient({
-    transport: { type: "http", url },
+    // a restarted server forgets its sessions, so the next use connects again
+    transport: { type: "http", url, onSessionExpired: () => forget(url) },
     clientName: "BearChat",
     capabilities: { elicitation: {} },
+    initializationOptions: requestOptions,
   });
   client.onElicitationRequest(ElicitationRequestSchema, (request) =>
     requestInput(new URL(url).host, request.params),
@@ -68,7 +72,9 @@ async function allPages<T extends { nextCursor?: string }>(
 
 async function listTools(url: string): Promise<ToolListing> {
   const mcp = await client(url);
-  const pages = await allPages((cursor) => mcp.listTools({ params: { cursor } }));
+  const pages = await allPages((cursor) =>
+    mcp.listTools({ params: { cursor }, options: requestOptions }),
+  );
   const definitions = { ...pages[0], tools: pages.flatMap((page) => page.tools) };
   const ttl = ttlSchema.safeParse(pages[0].ttlMs);
   return {
@@ -87,30 +93,45 @@ async function listTools(url: string): Promise<ToolListing> {
   };
 }
 
+/** The server's tools, where an expired listing is used once more while it is refreshed in the background. */
 async function toolListing(url: string): Promise<ToolListing> {
   const cached = toolListings.get(url);
 
-  const expires = cached && (await cached).expires;
-  const expired = expires !== undefined && Temporal.Instant.compare(Temporal.Now.instant(), expires) >= 0;
-
-  if (cached !== undefined && !expired) {
-    return cached;
+  if (cached === undefined) {
+    const pending = listTools(url);
+    pending.catch(() => toolListings.delete(url));
+    toolListings.set(url, pending);
+    return pending;
   }
 
-  const pending = listTools(url);
-  pending.catch(() => toolListings.delete(url));
-  toolListings.set(url, pending);
-  return pending;
+  const listing = await cached;
+
+  if (
+    listing.expires !== undefined &&
+    Temporal.Instant.compare(Temporal.Now.instant(), listing.expires) >= 0 &&
+    toolListings.get(url) === cached
+  ) {
+    // a failed refresh keeps the expired listing, so the next use retries
+    toolListings.set(url, listTools(url).catch(() => listing));
+  }
+
+  return listing;
+}
+
+/** Closes the server's client and drops its tools, so that the next use connects again. */
+function forget(url: string) {
+  const pending = clients.get(url);
+  clients.delete(url);
+  toolListings.delete(url);
+  // a client that failed to connect has nothing to close
+  pending?.then((open) => open.close()).catch(() => undefined);
 }
 
 /** Closes the clients of servers that were removed, disabled or moved to another URL. */
 function closeUnused(urls: ReadonlySet<string>) {
-  for (const [url, pending] of clients) {
+  for (const url of clients.keys()) {
     if (!urls.has(url)) {
-      clients.delete(url);
-      toolListings.delete(url);
-      // a client that failed to connect has nothing to close
-      pending.then((open) => open.close()).catch(() => undefined);
+      forget(url);
     }
   }
 }
@@ -126,28 +147,36 @@ export function enabledServers(settings: Settings): McpServer[] {
     .map(([name, server]) => ({ name, url: server.url }));
 }
 
+/** Called for each enabled server that cannot be reached, whose tools are then left out. */
+export type ServerErrorHandler = (server: string, error: unknown) => void;
+
 /**
  * Connects to the enabled servers and lists their tools as `name__tool`, with their instructions.
  * Built-in names never contain the separator and server names are unique,
  * so no tool can replace another one or inherit its approval.
  */
-export async function serverTools(settings: Settings) {
+export async function serverTools(settings: Settings, onError: ServerErrorHandler) {
   const servers = enabledServers(settings);
   closeUnused(new Set(servers.map((server) => server.url)));
   const listed = await Promise.all(
     servers.map(async ({ name, url }) => {
-      const [{ tools, readOnly }, { instructions }] = await Promise.all([
-        toolListing(url),
-        client(url),
-      ]);
-      return {
-        instructions: instructions && `Instructions of the MCP server ${name}:\n${instructions}`,
-        tools: Object.entries(tools).map(([tool, value]) => ({
-          name: `${name}__${tool}`,
-          value,
-          approved: readOnly.has(tool),
-        })),
-      };
+      try {
+        const [{ tools, readOnly }, { instructions }] = await Promise.all([
+          toolListing(url),
+          client(url),
+        ]);
+        return {
+          instructions: instructions && `Instructions of the MCP server ${name}:\n${instructions}`,
+          tools: Object.entries(tools).map(([tool, value]) => ({
+            name: `${name}__${tool}`,
+            value,
+            approved: readOnly.has(tool),
+          })),
+        };
+      } catch (error) {
+        onError(name, error);
+        return { instructions: undefined, tools: [] };
+      }
     }),
   );
   return {
@@ -175,7 +204,7 @@ async function eachServer<T>(
 
 export async function listPrompts(servers: McpServer[]) {
   const listed = await eachServer(servers, "prompts", async (mcp, server) =>
-    (await allPages((cursor) => mcp.listPrompts({ params: { cursor } })))
+    (await allPages((cursor) => mcp.listPrompts({ params: { cursor }, options: requestOptions })))
       .flatMap((page) => page.prompts)
       .map((prompt) => ({ server, prompt })),
   );
@@ -185,8 +214,10 @@ export async function listPrompts(servers: McpServer[]) {
 export async function listResources(servers: McpServer[]) {
   const listed = await eachServer(servers, "resources", async (mcp, server) => {
     const [pages, templates] = await Promise.all([
-      allPages((cursor) => mcp.listResources({ params: { cursor } })),
-      mcp.listResourceTemplates().catch(() => ({ resourceTemplates: [] })),
+      allPages((cursor) => mcp.listResources({ params: { cursor }, options: requestOptions })),
+      mcp
+        .listResourceTemplates({ options: requestOptions })
+        .catch(() => ({ resourceTemplates: [] })),
     ]);
     return {
       resources: pages.flatMap((page) => page.resources).map((resource) => ({ server, resource })),

@@ -1,20 +1,24 @@
 import type { ToolSet } from "ai";
 
-import { serverTools } from "@/lib/mcp";
+import { type ServerErrorHandler, serverTools } from "@/lib/mcp";
 import type { Settings } from "@/lib/settings";
 import { createChatTools } from "@/lib/tools/chats";
 import { fileTools } from "@/lib/tools/files";
 import { createPythonTool } from "@/lib/tools/python";
 
 /** Collects the enabled tools, the names of those that run without approval, and the servers' instructions. */
-export async function createTools(settings: Settings, threadId: string) {
+export async function createTools(
+  settings: Settings,
+  threadId: string,
+  onServerError: ServerErrorHandler,
+) {
   // Built-in tools only read or touch the app's own browser storage, so they always run.
   const builtIn: ToolSet = {
     ...(settings.fileTools ? fileTools : {}),
     ...(settings.chatTools ? createChatTools(threadId) : {}),
     ...(settings.pythonTool ? createPythonTool(settings.fileTools) : {}),
   };
-  const servers = await serverTools(settings);
+  const servers = await serverTools(settings, onServerError);
   return {
     tools: Object.assign(
       {},

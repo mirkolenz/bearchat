@@ -192,9 +192,9 @@ function ArgumentDialog<T>({
       onClose();
     } catch (failure) {
       setError(errorMessage(failure));
-    } finally {
-      setOpening(false);
     }
+
+    setOpening(false);
   };
 
   return (

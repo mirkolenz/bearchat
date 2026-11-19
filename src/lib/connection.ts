@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 import { config } from "@/lib/config";
-import { errorMessage, jsonSchema } from "@/lib/utils";
+import { jsonSchema } from "@/lib/schemas";
+import { errorMessage } from "@/lib/utils";
 
 const connectionSchema = z.object({ baseURL: z.string(), apiKey: z.string().optional() });
 // vLLM reports max_model_len and OpenRouter context_length, other servers neither

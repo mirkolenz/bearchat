@@ -32,6 +32,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  jsonSchema,
   mcpServerNameSchema,
   mcpServerURLSchema,
   type SettingKey,
@@ -44,7 +45,7 @@ import {
   updateUserSettings,
   useUserSettings,
 } from "@/lib/settings";
-import { cn, jsonSchema } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const tools = [
   {

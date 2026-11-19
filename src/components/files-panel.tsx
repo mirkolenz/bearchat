@@ -36,7 +36,7 @@ import {
   SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { dataURL, imageFormat, isImageName } from "@/lib/convert";
-import { deleteFile, listFiles, subscribeFiles, writeFile } from "@/lib/files";
+import { deleteFile, watchFiles, writeFile } from "@/lib/files";
 import { downloadFile, formatTime } from "@/lib/utils";
 
 const sizeFormat = new Intl.NumberFormat(undefined, {
@@ -50,22 +50,7 @@ const sizeFormat = new Intl.NumberFormat(undefined, {
 function useFiles(): File[] | undefined {
   const [files, setFiles] = useState<File[]>();
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      const next = await listFiles();
-
-      if (mounted) {
-        setFiles(next);
-      }
-    };
-    void load();
-    const unsubscribe = subscribeFiles(() => void load());
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
-  }, []);
+  useEffect(() => watchFiles(setFiles), []);
 
   return files;
 }
@@ -153,15 +138,21 @@ export function FilesPanel() {
   );
 }
 
+// Longer texts are cut off in the preview, which would otherwise render them in full.
+const maxPreviewLength = 100_000;
+
 function FilePreview({ file, onClose }: { file: File; onClose: () => void }) {
   const image = isImageName(file.name);
-  // the text, or the data URL of an image
+  // the text, or the data URL of an image, which is small since images are stored downscaled
   const [content, setContent] = useState<string>();
 
   useEffect(() => {
     const read = image
       ? file.bytes().then((bytes) => dataURL(imageFormat.mediaType, bytes))
-      : file.text();
+      : file
+          .slice(0, maxPreviewLength)
+          .text()
+          .then((text) => (file.size > maxPreviewLength ? `${text}…` : text));
     void read.then(setContent);
   }, [file, image]);
 

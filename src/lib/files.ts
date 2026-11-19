@@ -18,9 +18,45 @@ function changed() {
   changes.dispatchEvent(new Event("change"));
 }
 
-export function subscribeFiles(listener: () => void): () => void {
-  changes.addEventListener("change", listener);
-  return () => changes.removeEventListener("change", listener);
+/**
+ * Calls the listener with the files now and after every change, until the returned function is called.
+ * Changes during a listing are coalesced into one more listing, so that bursts such as uploads
+ * list the files only twice, and an older listing never replaces a newer one.
+ */
+export function watchFiles(listener: (files: File[]) => void): () => void {
+  let active = true;
+  let loading = false;
+  let stale = false;
+
+  const load = async () => {
+    if (loading) {
+      stale = true;
+      return;
+    }
+
+    loading = true;
+
+    try {
+      do {
+        stale = false;
+        const files = await listFiles();
+
+        if (active) {
+          listener(files);
+        }
+      } while (stale && active);
+    } finally {
+      loading = false;
+    }
+  };
+
+  const handle = () => void load();
+  changes.addEventListener("change", handle);
+  handle();
+  return () => {
+    active = false;
+    changes.removeEventListener("change", handle);
+  };
 }
 
 /** Validates a file name, accepting the absolute paths that Python passes. */

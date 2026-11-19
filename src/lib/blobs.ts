@@ -53,7 +53,8 @@ export async function persistBlobs(hashes: string[]) {
 
 /** An object URL for the referenced blob, revoked once it is no longer shown. */
 export function useBlobURL(url: string): string | undefined {
-  const [objectURL, setObjectURL] = useState<string>();
+  // tagged with its URL, so that the revoked object URL of a previous one is never shown
+  const [loaded, setLoaded] = useState<{ url: string; objectURL: string }>();
 
   useEffect(() => {
     let created: string | undefined;
@@ -63,7 +64,7 @@ export function useBlobURL(url: string): string | undefined {
       (data) => {
         if (active) {
           created = URL.createObjectURL(data);
-          setObjectURL(created);
+          setLoaded({ url, objectURL: created });
         }
       },
       () => undefined,
@@ -77,5 +78,5 @@ export function useBlobURL(url: string): string | undefined {
     };
   }, [url]);
 
-  return objectURL;
+  return loaded?.url === url ? loaded.objectURL : undefined;
 }

@@ -1,4 +1,3 @@
-import { useLiveQuery } from "dexie-react-hooks";
 import {
   FileDownIcon,
   GhostIcon,
@@ -7,7 +6,7 @@ import {
   SettingsIcon,
   SquarePenIcon,
 } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, memo, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { DeleteMenuItem } from "@/components/delete-menu-item";
@@ -42,23 +41,17 @@ import {
 } from "@/components/ui/sidebar";
 import { toMarkdown } from "@/lib/chat";
 import { config } from "@/lib/config";
-import type { Thread } from "@/lib/db";
-import { deleteThread, listThreads, loadThread, updateThread } from "@/lib/threads";
-import { openTemporaryThread, openThread } from "@/lib/route";
+import { deleteThread, loadThread, updateThread, useThreads } from "@/lib/threads";
+import { openTemporaryThread, openThread, useTargetId } from "@/lib/route";
 import { downloadFile } from "@/lib/utils";
 
 // shortcuts use ⌘ on Apple devices and Ctrl elsewhere
 const modifier = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
 
-interface AppSidebarProps {
-  activeId: string;
+export function AppSidebar({ onSignOut }: { onSignOut: () => void }) {
   // loaded before the first render, so the list never shows placeholders on startup
-  initialThreads: Thread[];
-  onSignOut: () => void;
-}
-
-export function AppSidebar({ activeId, initialThreads, onSignOut }: AppSidebarProps) {
-  const threads = useLiveQuery(listThreads, [], initialThreads);
+  const threads = useThreads();
+  const activeId = useTargetId();
   const { setOpenMobile } = useSidebar();
   const [query, setQuery] = useState("");
   const search = useRef<HTMLInputElement>(null);
@@ -156,7 +149,8 @@ export function AppSidebar({ activeId, initialThreads, onSignOut }: AppSidebarPr
                 {matches.map((thread) => (
                   <ThreadItem
                     key={thread.id}
-                    thread={thread}
+                    id={thread.id}
+                    title={thread.title}
                     active={thread.id === activeId}
                     navigate={navigate}
                   />
@@ -177,17 +171,19 @@ export function AppSidebar({ activeId, initialThreads, onSignOut }: AppSidebarPr
 }
 
 interface ThreadItemProps {
-  thread: Thread;
+  id: string;
+  title: string;
   active: boolean;
   // opens a page and closes the overlaid sidebar
   navigate: (open: () => void) => void;
 }
 
-function ThreadItem({ thread, active, navigate }: ThreadItemProps) {
+// Memoized with plain props, so that a changed chat, a search or a navigation only re-renders the affected rows.
+const ThreadItem = memo(function ThreadItem({ id, title, active, navigate }: ThreadItemProps) {
   const [renaming, setRenaming] = useState(false);
 
   const remove = () => {
-    void deleteThread(thread.id);
+    void deleteThread(id);
 
     if (active) {
       navigate(() => openThread());
@@ -195,14 +191,14 @@ function ThreadItem({ thread, active, navigate }: ThreadItemProps) {
   };
 
   const exportMarkdown = async () => {
-    const { messages } = await loadThread(thread.id);
-    downloadFile(`${thread.title}.md`, toMarkdown(messages), "text/markdown");
+    const { messages } = await loadThread(id);
+    downloadFile(`${title}.md`, toMarkdown(messages), "text/markdown");
   };
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton isActive={active} onClick={() => navigate(() => openThread(thread.id))}>
-        <span className="truncate">{thread.title}</span>
+      <SidebarMenuButton isActive={active} onClick={() => navigate(() => openThread(id))}>
+        <span className="truncate">{title}</span>
       </SidebarMenuButton>
       <SidebarItemMenu label="Chat actions">
         <DropdownMenuItem onClick={() => setRenaming(true)}>
@@ -215,19 +211,25 @@ function ThreadItem({ thread, active, navigate }: ThreadItemProps) {
         </DropdownMenuItem>
         <DeleteMenuItem onDelete={remove} />
       </SidebarItemMenu>
-      {renaming && <RenameDialog thread={thread} onClose={() => setRenaming(false)} />}
+      {renaming && <RenameDialog id={id} title={title} onClose={() => setRenaming(false)} />}
     </SidebarMenuItem>
   );
+});
+
+interface RenameDialogProps {
+  id: string;
+  title: string;
+  onClose: () => void;
 }
 
-function RenameDialog({ thread, onClose }: { thread: Thread; onClose: () => void }) {
-  const [title, setTitle] = useState(thread.title);
+function RenameDialog({ id, title: initial, onClose }: RenameDialogProps) {
+  const [title, setTitle] = useState(initial);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
 
     if (title.trim()) {
-      void updateThread(thread.id, { title: title.trim() });
+      void updateThread(id, { title: title.trim() });
     }
 
     onClose();

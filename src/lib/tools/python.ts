@@ -52,6 +52,8 @@ export function createPythonTool(files: boolean) {
             "e.g. Path('notes.txt').read_text() or write_text(), but open() is not supported."
           : "It has no files."),
       inputSchema: z.object({ code: z.string() }),
+      // starts loading Monty while the model writes the code, a failure is reported by execute
+      onInputStart: () => void montyPool().catch(() => undefined),
       execute: async ({ code }) => {
         const { CollectString, NOT_HANDLED } = await loadMonty();
         const session = await (

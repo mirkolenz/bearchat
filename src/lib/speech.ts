@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const language = new Intl.Locale(navigator.language).language;
 
@@ -18,23 +18,48 @@ const options = { langs: [navigator.language], processLocally: true };
 // only Chromium offers on-device recognition
 const supported = "SpeechRecognition" in window && "available" in SpeechRecognition;
 
+/** Downloads the language pack if needed, checked on demand since the check itself may download it. */
+async function prepareDictation() {
+  if ((await SpeechRecognition.available(options)) === "unavailable") {
+    throw new Error(`On-device dictation is not available for ${navigator.language}`);
+  }
+
+  await SpeechRecognition.install(options);
+}
+
 /** Dictation that only runs on-device, so audio never leaves the browser. */
 export function useDictation(onText: (text: string) => void) {
   const [listening, setListening] = useState(false);
+  // set while preparing too, so that a second toggle cancels instead of starting another one
   const recognition = useRef<SpeechRecognition>(null);
 
+  // dictation ends with the chat, e.g. when another one is opened
+  useEffect(
+    () => () => {
+      const current = recognition.current;
+      recognition.current = null;
+      current?.abort();
+    },
+    [],
+  );
+
+  // ends the instance's session unless another one took its place
+  const release = (instance: SpeechRecognition) => {
+    if (recognition.current === instance) {
+      recognition.current = null;
+      setListening(false);
+    }
+  };
+
   const toggle = async () => {
-    if (recognition.current) {
-      recognition.current.stop();
+    const current = recognition.current;
+
+    if (current) {
+      release(current);
+      current.stop();
       return;
     }
 
-    // checked on demand since the check itself may download the language pack
-    if ((await SpeechRecognition.available(options)) === "unavailable") {
-      throw new Error(`On-device dictation is not available for ${navigator.language}`);
-    }
-
-    await SpeechRecognition.install(options);
     const instance = new SpeechRecognition();
     instance.lang = navigator.language;
     instance.continuous = true;
@@ -43,13 +68,19 @@ export function useDictation(onText: (text: string) => void) {
       const results = Array.from(event.results).slice(event.resultIndex);
       onText(results.map((result) => result[0].transcript).join(" "));
     });
-    instance.addEventListener("end", () => {
-      recognition.current = null;
-      setListening(false);
-    });
+    instance.addEventListener("end", () => release(instance));
     recognition.current = instance;
-    instance.start();
     setListening(true);
+
+    await prepareDictation().catch((error: unknown) => {
+      release(instance);
+      throw error;
+    });
+
+    // unless it was stopped or the chat closed in the meantime
+    if (recognition.current === instance) {
+      instance.start();
+    }
   };
 
   return { supported, listening, toggle };

@@ -17,9 +17,10 @@ import { z } from "zod";
 import { blobHash, loadBlob } from "@/lib/blobs";
 import { metadataSchema } from "@/lib/schemas";
 import type { Connection } from "@/lib/connection";
+import type { ServerErrorHandler } from "@/lib/mcp";
 import type { ResolvedSettings } from "@/lib/settings";
 import { createTools } from "@/lib/tools";
-import { now } from "@/lib/utils";
+import { memoize, now } from "@/lib/utils";
 
 export type ChatMessage = UIMessage<z.infer<typeof metadataSchema>, never, UITools>;
 
@@ -42,19 +43,20 @@ function systemPrompt(instructions: string, serverInstructions: string[]): strin
   return [instructions, ...serverInstructions].filter(Boolean).join("\n\n");
 }
 
-/** Resolves the blob references of attachments and tool results when a request is sent. */
-const downloadBlobs: Experimental_DownloadFunction = (requests) =>
-  Promise.all(
-    requests.map(async ({ url }) => {
-      if (blobHash(url.href) === undefined) {
-        return null;
-      }
-
-      const data = await loadBlob(url.href);
-      return { data: await data.bytes(), mediaType: data.type };
-    }),
-  );
-
+/**
+ * Resolves the blob references of attachments and tool results when a request is sent.
+ * Each step of the agent sends all of them again, so they are read once per request.
+ */
+function blobDownloader(): Experimental_DownloadFunction {
+  const download = memoize(async (url: string) => {
+    const data = await loadBlob(url);
+    return { data: await data.bytes(), mediaType: data.type };
+  });
+  return (requests) =>
+    Promise.all(
+      requests.map(async ({ url: { href } }) => (blobHash(href) === undefined ? null : download(href))),
+    );
+}
 
 async function textFilePart(part: FileUIPart): Promise<TextUIPart> {
   const text = await (await loadBlob(part.url)).text();
@@ -94,8 +96,9 @@ async function createAgent(
   settings: ResolvedSettings,
   threadId: string,
   continuing: boolean,
+  onServerError: ServerErrorHandler,
 ) {
-  const { tools, approved, instructions } = await createTools(settings, threadId);
+  const { tools, approved, instructions } = await createTools(settings, threadId, onServerError);
   const provider = createOpenAICompatible({
     name: "bearchat",
     baseURL: connection.baseURL,
@@ -121,7 +124,7 @@ async function createAgent(
     toolOrder: [],
     // the default of 20 steps cuts off longer tasks with the file tools
     stopWhen: stepCountIs(100),
-    experimental_download: downloadBlobs,
+    experimental_download: blobDownloader(),
     toolApproval: ({ toolCall }) =>
       approved.has(toolCall.toolName) ? "approved" : approvals[settings.mode],
   });
@@ -132,17 +135,24 @@ export function createTransport(
   connection: Connection,
   settings: ResolvedSettings,
   threadId: string,
+  onServerError: ServerErrorHandler,
 ): ChatTransport<ChatMessage> {
   return {
     sendMessages: async (options) => {
       let waiting = true;
-      const transport = new DirectChatTransport({
-        agent: await createAgent(
+      // the attachments are read while the MCP servers are reached
+      const [agent, messages] = await Promise.all([
+        createAgent(
           connection,
           settings,
           threadId,
           continueSchema.safeParse(options.body).success,
+          onServerError,
         ),
+        Promise.all(options.messages.map(modelMessage)),
+      ]);
+      const transport = new DirectChatTransport({
+        agent,
         messageMetadata: ({ part }) => {
           switch (part.type) {
             case "start":
@@ -167,10 +177,7 @@ export function createTransport(
           }
         },
       });
-      return transport.sendMessages({
-        ...options,
-        messages: await Promise.all(options.messages.map(modelMessage)),
-      });
+      return transport.sendMessages({ ...options, messages });
     },
     reconnectToStream: async () => null,
   };
@@ -183,7 +190,7 @@ export function messageText(message: ChatMessage): string {
     .join("\n\n");
 }
 
-export function deriveTitle(messages: ChatMessage[]): string {
+export function deriveTitle(messages: readonly ChatMessage[]): string {
   const first = messages.find((message) => message.role === "user");
   const text = first ? messageText(first).replaceAll(/\s+/g, " ").trim() : "";
   return text.length > 60 ? `${text.slice(0, 60)}…` : text || "New chat";

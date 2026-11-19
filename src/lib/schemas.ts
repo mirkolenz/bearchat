@@ -1,6 +1,16 @@
 // Formats that are persisted or read from outside, kept free of other imports so the build can publish them as JSON Schema.
 import { z } from "zod";
 
+/** Parses a JSON string, so that it can be piped into a schema of the expected shape. */
+export const jsonSchema = z.string().transform((text, context): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    context.addIssue({ code: "custom", message: "Invalid JSON" });
+    return z.NEVER;
+  }
+});
+
 const timestamp = z.int().nonnegative().describe("Milliseconds since the Unix epoch");
 const tokens = z.int().nonnegative();
 

@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 export { cn } from "cn";
 
 export function errorMessage(error: unknown): string {
@@ -42,6 +40,44 @@ export function lazy<T>(init: () => Promise<T>): () => Promise<T> {
     }));
 }
 
+/** Memoizes an asynchronous function by its argument, where a failure is retried on the next call. */
+export function memoize<K, V>(init: (key: K) => Promise<V>): (key: K) => Promise<V> {
+  const cache = new Map<K, Promise<V>>();
+  return (key) => {
+    let pending = cache.get(key);
+
+    if (pending === undefined) {
+      pending = init(key).catch((error: unknown) => {
+        cache.delete(key);
+        throw error;
+      });
+      cache.set(key, pending);
+    }
+
+    return pending;
+  };
+}
+
+/** Like Promise.allSettled over the mapped items, but with at most `limit` of them running at once. */
+export async function settleConcurrently<T, R>(
+  items: readonly T[],
+  limit: number,
+  map: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = [];
+  const queue = items.entries();
+
+  // each runner takes the next item until none are left
+  const run = async () => {
+    for (const [index, item] of queue) {
+      [results[index]] = await Promise.allSettled([map(item)]);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+  return results;
+}
+
 /** Decodes UTF-8 text, or returns undefined for binary data, which models cannot read as text. */
 export function decodeText(bytes: Uint8Array): string | undefined {
   try {
@@ -59,13 +95,3 @@ export function downloadFile(name: string, content: BlobPart, type?: string) {
   link.click();
   URL.revokeObjectURL(url);
 }
-
-/** Parses a JSON string, so that it can be piped into a schema of the expected shape. */
-export const jsonSchema = z.string().transform((text, context): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    context.addIssue({ code: "custom", message: "Invalid JSON" });
-    return z.NEVER;
-  }
-});

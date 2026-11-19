@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 
 import type { ChatMessage } from "@/lib/chat";
-import { loadTranscript, loadTranscripts } from "@/lib/threads";
+import { listThreads, loadTranscript, loadTranscripts, type Transcript } from "@/lib/threads";
 import { rangeSchema, sliceRange } from "@/lib/tools/range";
 import { formatTime } from "@/lib/utils";
 
@@ -27,6 +27,39 @@ function excerpt(text: string, lower: string, terms: string[]): string | undefin
   return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
 }
 
+// chats read per transaction while searching
+const batchSize = 20;
+
+interface SearchResult {
+  id: string;
+  title: string;
+  updated: string;
+  messages: number;
+  excerpts: string[];
+}
+
+/** The chat as a search result if its title or messages contain all terms. */
+function searchTranscript({ thread, messages }: Transcript, terms: string[]): SearchResult | undefined {
+  const lowered = messages.map((message) => message.text.toLowerCase());
+  const texts = [thread.title.toLowerCase(), ...lowered];
+
+  if (!terms.every((term) => texts.some((text) => text.includes(term)))) {
+    return undefined;
+  }
+
+  const excerpts = messages.flatMap(({ role, text }, index) => {
+    const found = excerpt(text, lowered[index], terms);
+    return found === undefined ? [] : [messageLine(index + 1, role, found)];
+  });
+  return {
+    id: thread.id,
+    title: thread.title,
+    updated: formatTime(thread.updatedAt),
+    messages: messages.length,
+    excerpts: excerpts.slice(0, maxExcerpts),
+  };
+}
+
 /** Tools for the saved chats, hiding the current one, which the model already sees. */
 export function createChatTools(currentId: string) {
   return {
@@ -42,33 +75,16 @@ export function createChatTools(currentId: string) {
       }),
       execute: async ({ query = "", limit = 10 }) => {
         const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-        return (await loadTranscripts())
-          .values()
-          .filter(({ thread }) => thread.id !== currentId)
-          .flatMap(({ thread, messages }) => {
-            const lowered = messages.map((message) => message.text.toLowerCase());
-            const texts = [thread.title.toLowerCase(), ...lowered];
+        const threads = (await listThreads()).filter((thread) => thread.id !== currentId);
+        const found: SearchResult[] = [];
 
-            if (!terms.every((term) => texts.some((text) => text.includes(term)))) {
-              return [];
-            }
+        // chats are read in batches until enough match, so a search rarely reads all of them
+        for (let start = 0; start < threads.length && found.length < limit; start += batchSize) {
+          const transcripts = await loadTranscripts(threads.slice(start, start + batchSize));
+          found.push(...transcripts.flatMap((transcript) => searchTranscript(transcript, terms) ?? []));
+        }
 
-            const excerpts = messages.flatMap(({ role, text }, index) => {
-              const found = excerpt(text, lowered[index], terms);
-              return found === undefined ? [] : [messageLine(index + 1, role, found)];
-            });
-            return [
-              {
-                id: thread.id,
-                title: thread.title,
-                updated: formatTime(thread.updatedAt),
-                messages: messages.length,
-                excerpts: excerpts.slice(0, maxExcerpts),
-              },
-            ];
-          })
-          .take(limit)
-          .toArray();
+        return found.slice(0, limit);
       },
     }),
     read_chat: tool({

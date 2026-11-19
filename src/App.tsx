@@ -1,32 +1,44 @@
 import { SquarePenIcon } from "lucide-react";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
+import { createRoot } from "react-dom/client";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { Thread } from "@/components/chat";
 import { Hint } from "@/components/hint";
 import { InputRequestDialog } from "@/components/input-request-dialog";
 import { Login } from "@/components/login";
+import { Toaster } from "@/components/toaster";
 import { Button } from "@/components/ui/button";
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { toast } from "@/components/ui/toast";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { config } from "@/lib/config";
-import { type Session, resumeSession, signOut } from "@/lib/connection";
-import type { Thread as ThreadData } from "@/lib/db";
-import { listThreads } from "@/lib/threads";
-import { openThread, startRouting, usePage } from "@/lib/route";
+import { type Session, signOut } from "@/lib/connection";
+import { openThread, usePage } from "@/lib/route";
+import { errorMessage } from "@/lib/utils";
+import type { Startup } from "@/start";
 
-interface Startup {
-  session?: Session;
-  error?: string;
-  threads: ThreadData[];
+export function renderApp(container: HTMLElement, startup: Startup) {
+  // Writes such as saving a chat run in the background, so their failures are reported here.
+  window.addEventListener("unhandledrejection", (event) =>
+    toast.add({
+      type: "error",
+      title: "Something went wrong",
+      description: errorMessage(event.reason),
+    }),
+  );
+  createRoot(container).render(
+    <StrictMode>
+      <TooltipProvider>
+        <Toaster>
+          <App startup={startup} />
+        </Toaster>
+      </TooltipProvider>
+    </StrictMode>,
+  );
 }
 
-/** Loads everything the first render needs in parallel, so the app renders once without fallbacks. */
-export async function start(): Promise<Startup> {
-  const [resumed, threads] = await Promise.all([resumeSession(), listThreads(), startRouting()]);
-  return { ...resumed, threads };
-}
-
-export function App({ startup }: { startup: Startup }) {
+function App({ startup }: { startup: Startup }) {
   const [session, setSession] = useState(startup.session);
 
   return (
@@ -37,7 +49,6 @@ export function App({ startup }: { startup: Startup }) {
       ) : (
         <Workspace
           session={session}
-          threads={startup.threads}
           onSignOut={() => void signOut().then(() => setSession(undefined))}
         />
       )}
@@ -47,14 +58,13 @@ export function App({ startup }: { startup: Startup }) {
 
 interface WorkspaceProps {
   session: Session;
-  threads: ThreadData[];
   onSignOut: () => void;
 }
 
 // whether the docked sidebar is open, the overlay on small screens always starts closed
 const sidebarKey = "bearchat:sidebar";
 
-function Workspace({ session, threads, onSignOut }: WorkspaceProps) {
+function Workspace({ session, onSignOut }: WorkspaceProps) {
   const { route, thread } = usePage();
   const [sidebarOpen, setSidebarOpen] = useState(
     () => localStorage.getItem(sidebarKey) !== "false",
@@ -69,7 +79,7 @@ function Workspace({ session, threads, onSignOut }: WorkspaceProps) {
       }}
       className="h-(--viewport-height) min-h-0"
     >
-      <AppSidebar activeId={route.id} initialThreads={threads} onSignOut={onSignOut} />
+      <AppSidebar onSignOut={onSignOut} />
       <SidebarInset className="min-h-0 min-w-0 px-safe-0">
         <Header />
         <Thread key={route.id} route={route} thread={thread} session={session} />

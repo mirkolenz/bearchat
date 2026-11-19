@@ -1,5 +1,4 @@
-import { useSyncExternalStore } from "react";
-
+import { createStore } from "@/lib/store";
 import { type LoadedThread, loadThread } from "@/lib/threads";
 
 // The active chat lives in the query string, which static file servers ignore.
@@ -15,8 +14,9 @@ export interface Page {
   thread: LoadedThread;
 }
 
-let current: Page | undefined;
-const listeners = new Set<() => void>();
+const page = createStore<Page | undefined>(undefined);
+// the chat being opened, which the sidebar marks while it loads
+const target = createStore<Route | undefined>(undefined);
 // new chats have nothing to load, so they are shown at once
 const newThread: LoadedThread = { messages: [], exists: false, settings: {}, skipped: 0 };
 
@@ -34,20 +34,28 @@ function parseRoute(href: string): Route | undefined {
   return id === null ? undefined : { id, temporary: params.has("temporary") };
 }
 
-function publish(page: Page) {
-  current = page;
-  listeners.forEach((listener) => listener());
+function publish(next: Page) {
+  target.set(next.route);
+  page.set(next);
 }
 
-async function show(route: Route, signal?: AbortSignal) {
-  const thread = await loadThread(route.id);
+async function show(route: Route, signal: AbortSignal) {
+  target.set(route);
 
-  // a later navigation replaced this one while the chat was loading
-  if (signal?.aborted) {
-    return;
+  try {
+    const thread = await loadThread(route.id);
+
+    // a later navigation replaced this one while the chat was loading
+    if (!signal.aborted) {
+      publish({ route, thread });
+    }
+  } catch (error) {
+    if (!signal.aborted) {
+      target.set(page.get()?.route);
+    }
+
+    throw error;
   }
-
-  publish({ route, thread });
 }
 
 // the navigation info marks routes of new chats
@@ -67,16 +75,18 @@ export function openTemporaryThread() {
 const inAppNavigations: ReadonlySet<NavigationType> = new Set(["push", "replace", "traverse"]);
 
 /** Shows the chat of the current URL, starting a new one if there is none, and follows later navigations. */
-export async function startRouting(): Promise<void> {
-  let route = parseRoute(location.href);
+export async function startRouting(): Promise<Page> {
+  const route = parseRoute(location.href);
+  const initial =
+    route === undefined
+      ? { route: { id: crypto.randomUUID(), temporary: false }, thread: newThread }
+      : { route, thread: await loadThread(route.id) };
 
   if (route === undefined) {
-    route = { id: crypto.randomUUID(), temporary: false };
-    history.replaceState(null, "", routeURL(route));
-    publish({ route, thread: newThread });
-  } else {
-    await show(route);
+    history.replaceState(null, "", routeURL(initial.route));
   }
+
+  publish(initial);
 
   // Navigations within the app only change the query string, so they stay in the page.
   navigation.addEventListener("navigate", (event) => {
@@ -106,19 +116,21 @@ export async function startRouting(): Promise<void> {
       },
     });
   });
-}
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  return initial;
 }
 
 export function usePage(): Page {
-  const page = useSyncExternalStore(subscribe, () => current);
+  const current = page.useValue();
 
-  if (page === undefined) {
+  if (current === undefined) {
     throw new Error("The page is rendered before routing started");
   }
 
-  return page;
+  return current;
+}
+
+/** The id of the chat that is shown or being opened. */
+export function useTargetId(): string | undefined {
+  return target.useValue()?.id;
 }

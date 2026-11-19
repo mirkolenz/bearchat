@@ -1,5 +1,6 @@
 import type { ElicitationRequest, ElicitResult } from "@ai-sdk/mcp";
-import { useSyncExternalStore } from "react";
+
+import { createStore } from "@/lib/store";
 
 // Requests for user input that MCP servers send while handling a tool call, answered one at a time.
 export interface InputRequest {
@@ -10,13 +11,7 @@ export interface InputRequest {
   respond: (result: ElicitResult) => void;
 }
 
-let queue: readonly InputRequest[] = [];
-const listeners = new Set<() => void>();
-
-function update(next: readonly InputRequest[]) {
-  queue = next;
-  listeners.forEach((listener) => listener());
-}
+const queue = createStore<readonly InputRequest[]>([]);
 
 /** Asks the user for the input a server requested, resolving once they answered. */
 export function requestInput(
@@ -30,20 +25,15 @@ export function requestInput(
       message,
       requestedSchema,
       respond: (result) => {
-        update(queue.filter((entry) => entry !== request));
+        queue.set(queue.get().filter((entry) => entry !== request));
         resolve(result);
       },
     };
-    update([...queue, request]);
+    queue.set([...queue.get(), request]);
   });
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
 }
 
 /** The request to show next, if any. */
 export function useInputRequest(): InputRequest | undefined {
-  return useSyncExternalStore(subscribe, () => queue[0]);
+  return queue.useValue()[0];
 }

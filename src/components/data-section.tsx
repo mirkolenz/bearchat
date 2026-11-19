@@ -10,7 +10,8 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { useConfirm } from "@/hooks/use-confirm";
-import { downloadFile, errorMessage, jsonSchema } from "@/lib/utils";
+import { jsonSchema } from "@/lib/schemas";
+import { downloadFile, errorMessage } from "@/lib/utils";
 
 interface Status {
   message?: string;

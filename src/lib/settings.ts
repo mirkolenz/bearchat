@@ -1,9 +1,9 @@
-import { useSyncExternalStore } from "react";
 import { z } from "zod";
 
 import { config } from "@/lib/config";
-import { chatSettingsSchema, type SettingKey, settingsSchema } from "@/lib/schemas";
-import { jsonSchema } from "@/lib/utils";
+import type { Model } from "@/lib/connection";
+import { chatSettingsSchema, jsonSchema, type SettingKey, settingsSchema } from "@/lib/schemas";
+import { createStore } from "@/lib/store";
 
 // Settings are resolved from these layers, later ones take precedence:
 // built-in, deployment (`defaults` in config.json), user (this browser), chat (stored with each chat),
@@ -52,7 +52,6 @@ export function resolveSettings(user: UserLayer, chat: ChatSettings = {}): Setti
 // Only the user's changes are stored, so later deployment or built-in changes still apply.
 const storageKey = "bearchat:settings";
 const userLayerSchema = jsonSchema.pipe(z.record(z.string(), z.unknown())).catch({});
-const listeners = new Set<() => void>();
 
 function readUserLayer(): UserLayer {
   const value = localStorage.getItem(storageKey);
@@ -60,11 +59,10 @@ function readUserLayer(): UserLayer {
 }
 
 let userLayer = readUserLayer();
-let userSettings = resolveSettings(userLayer);
+const userSettings = createStore(resolveSettings(userLayer));
 
 function publish() {
-  userSettings = resolveSettings(userLayer);
-  listeners.forEach((listener) => listener());
+  userSettings.set(resolveSettings(userLayer));
 }
 
 // keeps open tabs in sync
@@ -75,14 +73,21 @@ window.addEventListener("storage", (event) => {
   }
 });
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
 /** The settings of this browser without a chat layer, which new chats start from. */
 export function useUserSettings(): Settings {
-  return useSyncExternalStore(subscribe, () => userSettings);
+  return userSettings.useValue();
+}
+
+/**
+ * The settings of a chat, whose model falls back to the first one served if the chat's or user's is not.
+ * As a hook, the React Compiler keeps its result the same object until an input changes.
+ */
+export function useChatSettings(chat: ChatSettings, models: Model[]): ResolvedSettings {
+  const resolved = resolveSettings(useUserSettings(), chat);
+  return {
+    ...resolved,
+    model: models.find((model) => model.id === resolved.model)?.id ?? models[0].id,
+  };
 }
 
 export function updateUserSettings(patch: Partial<Settings>) {

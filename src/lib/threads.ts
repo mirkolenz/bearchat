@@ -4,7 +4,7 @@ import {
   safeValidateUIMessages,
   validateUIMessages,
 } from "ai";
-import { Dexie } from "dexie";
+import { Dexie, liveQuery } from "dexie";
 import type { z } from "zod";
 
 import { blobHash, loadBlob, persistBlobs, storeBlob } from "@/lib/blobs";
@@ -13,24 +13,30 @@ import { dataURL } from "@/lib/convert";
 import { db, type MessageRow, type Thread } from "@/lib/db";
 import { backupSchema, chatSettingsSchema, metadataSchema, threadSchema } from "@/lib/schemas";
 import type { ChatSettings } from "@/lib/settings";
+import { createStore } from "@/lib/store";
 import { contentResultSchema } from "@/lib/tools/content";
-import { now } from "@/lib/utils";
+import { memoize, now } from "@/lib/utils";
 
 
 const importedSettingsSchema = chatSettingsSchema.omit({ mode: true });
 
+/** The messages of a chat in order. */
 function messagesOf(threadId: string) {
   return db.messages
     .where("[threadId+position]")
     .between([threadId, Dexie.minKey], [threadId, Dexie.maxKey]);
 }
 
+/** The messages of a chat by their primary key, which deletes in one range instead of row by row. */
+function messageKeysOf(threadId: string) {
+  return db.messages
+    .where("[threadId+id]")
+    .between([threadId, Dexie.minKey], [threadId, Dexie.maxKey]);
+}
+
 async function deleteUnusedBlobs(hashes: string[]) {
-  for (const hash of new Set(hashes)) {
-    if ((await db.messages.where("blobs").equals(hash).count()) === 0) {
-      await db.blobs.delete(hash);
-    }
-  }
+  const used = new Set(await db.messages.where("blobs").anyOf(hashes).keys());
+  await db.blobs.bulkDelete([...new Set(hashes)].filter((hash) => !used.has(hash)));
 }
 
 /** Rewrites the URLs of a message's binary content, in file parts and in the images of tool results. */
@@ -77,24 +83,32 @@ async function mapContentURLsAsync(
   return mapContentURLs(message, (url) => mapped.get(url) ?? url);
 }
 
+function blobHashes(message: ChatMessage): string[] {
+  return contentURLs(message).flatMap((url) => blobHash(url) ?? []);
+}
+
 /**
  * Replaces a chat and its messages in one transaction, which also stores the blobs they reference.
  * The chat is built from the stored one, if any, and only created when asked to.
+ * Given the messages of the last save, only the messages that were replaced since are written,
+ * since the chat replaces a message object whenever it changes.
  */
 function writeThread(
   id: string,
-  messages: ChatMessage[],
+  messages: readonly ChatMessage[],
   create: boolean,
   build: (existing: Thread | undefined) => Thread,
+  saved?: readonly ChatMessage[],
 ) {
-  const rows: MessageRow[] = messages.map((message, position) => ({
-    ...message,
-    threadId: id,
-    position,
-    blobs: contentURLs(message).flatMap((url) => blobHash(url) ?? []),
-  }));
+  const rows: MessageRow[] = messages.flatMap((message, position) =>
+    saved?.[position] === message
+      ? []
+      : [{ ...message, threadId: id, position, blobs: blobHashes(message) }],
+  );
+  // the saved messages that are replaced or removed
+  const stale = saved?.filter((message, position) => messages[position] !== message);
 
-  return db.transaction("rw", db.tables, async () => {
+  return db.transaction("rw", db.threads, db.messages, db.blobs, async () => {
     const existing = await db.threads.get(id);
 
     // a late save of a deleted chat, e.g. of its aborted response, must not restore it
@@ -102,12 +116,20 @@ function writeThread(
       return;
     }
 
-    const previous = await messagesOf(id).toArray();
     await db.threads.put(build(existing));
-    await messagesOf(id).delete();
+    let dropped: string[];
+
+    if (stale === undefined) {
+      dropped = (await messagesOf(id).toArray()).flatMap((row) => row.blobs);
+      await messageKeysOf(id).delete();
+    } else {
+      dropped = stale.flatMap(blobHashes);
+      await db.messages.bulkDelete(stale.map((message) => [id, message.id]));
+    }
+
     await persistBlobs(rows.flatMap((row) => row.blobs));
     await db.messages.bulkPut(rows);
-    await deleteUnusedBlobs(previous.flatMap((row) => row.blobs));
+    await deleteUnusedBlobs(dropped);
   });
 }
 
@@ -117,21 +139,42 @@ export async function listThreads(): Promise<Thread[]> {
   return threads.flatMap((thread) => threadSchema.safeParse(thread).data ?? []);
 }
 
+const threadList = createStore<Thread[]>([]);
+
+/** Keeps the list of chats up to date, also with changes of other tabs, resolving once it is loaded. */
+export function watchThreads(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    liveQuery(listThreads).subscribe({
+      next: (threads) => {
+        threadList.set(threads);
+        resolve();
+      },
+      error: reject,
+    });
+  });
+}
+
+/** The chats, most recently updated first. */
+export function useThreads(): Thread[] {
+  return threadList.useValue();
+}
+
 /** Loads a chat, skipping messages that no longer match the AI SDK's message format. */
 export async function loadThread(id: string) {
   const { thread, rows } = await db.transaction("r", db.threads, db.messages, async () => ({
     thread: await db.threads.get(id),
     rows: await messagesOf(id).toArray(),
   }));
-  const results = await Promise.all(
-    rows.map(({ id, role, metadata, parts }) =>
-      safeValidateUIMessages<ChatMessage>({
-        messages: [{ id, role, metadata, parts }],
-        metadataSchema,
-      }),
-    ),
-  );
-  const messages = results.flatMap((result) => (result.success ? result.data : []));
+  const stored = rows.map(({ id, role, metadata, parts }) => ({ id, role, metadata, parts }));
+  const validate = (messages: unknown[]) =>
+    safeValidateUIMessages<ChatMessage>({ messages, metadataSchema });
+  const all = await validate(stored);
+  // only a chat with invalid messages is validated message by message, to keep the valid ones
+  const messages = all.success
+    ? all.data
+    : (await Promise.all(stored.map((message) => validate([message])))).flatMap(
+        (result) => (result.success ? result.data : []),
+      );
   return {
     messages,
     // whether the chat is stored, which new and deleted chats are not
@@ -167,31 +210,58 @@ export async function loadTranscript(id: string): Promise<Transcript | undefined
   return parsed.success ? toTranscript(parsed.data, rows) : undefined;
 }
 
-/** The transcripts of all chats, most recently updated first, read in one transaction. */
-export async function loadTranscripts(): Promise<Transcript[]> {
-  const { threads, rows } = await db.transaction("r", db.threads, db.messages, async () => ({
-    threads: await listThreads(),
-    rows: await db.messages.orderBy("[threadId+position]").toArray(),
-  }));
-  const grouped = Map.groupBy(rows, (row) => row.threadId);
-  return threads.map((thread) => toTranscript(thread, grouped.get(thread.id) ?? []));
+/** The transcripts of the given chats, read in one transaction. */
+export async function loadTranscripts(threads: readonly Thread[]): Promise<Transcript[]> {
+  const rows = await db.transaction("r", db.messages, () =>
+    Promise.all(threads.map((thread) => messagesOf(thread.id).toArray())),
+  );
+  return threads.map((thread, index) => toTranscript(thread, rows[index]));
 }
 
-/** Saves a chat, which is only created when asked to, so that deleted chats stay deleted. */
-export function saveThread(
+function writeChat(
   id: string,
   settings: ChatSettings,
-  messages: ChatMessage[],
+  messages: readonly ChatMessage[],
   create: boolean,
+  saved?: readonly ChatMessage[],
 ) {
   const time = now();
-  return writeThread(id, messages, create, (existing) => ({
+  return writeThread(
     id,
-    title: existing?.title ?? deriveTitle(messages),
-    createdAt: existing?.createdAt ?? time,
-    updatedAt: time,
-    settings,
-  }));
+    messages,
+    create,
+    (existing) => ({
+      id,
+      title: existing?.title ?? deriveTitle(messages),
+      createdAt: existing?.createdAt ?? time,
+      updatedAt: time,
+      settings,
+    }),
+    saved,
+  );
+}
+
+/** Saves a new chat, such as a fork. */
+export function saveThread(id: string, settings: ChatSettings, messages: readonly ChatMessage[]) {
+  return writeChat(id, settings, messages, true);
+}
+
+/**
+ * Saves the loaded chat whenever it changed, writing only the messages that changed since the last save.
+ * The first save creates the chat, later ones only update it, so that a chat deleted meanwhile stays deleted.
+ */
+export function threadSaver(id: string, loaded: LoadedThread) {
+  let exists = loaded.exists;
+  // What the database holds, which is unknown if messages were skipped, since their positions are still taken.
+  // It only advances once a save is committed, so a failed save is repeated by the next one.
+  let saved: readonly ChatMessage[] | undefined = loaded.skipped === 0 ? loaded.messages : undefined;
+
+  return async (settings: ChatSettings, messages: readonly ChatMessage[]) => {
+    const create = !exists;
+    exists = true;
+    await writeChat(id, settings, messages, create, saved);
+    saved = messages;
+  };
 }
 
 export function updateThread(id: string, patch: Partial<Pick<Thread, "title" | "settings">>) {
@@ -199,9 +269,9 @@ export function updateThread(id: string, patch: Partial<Pick<Thread, "title" | "
 }
 
 export function deleteThread(id: string) {
-  return db.transaction("rw", db.tables, async () => {
+  return db.transaction("rw", db.threads, db.messages, db.blobs, async () => {
     const rows = await messagesOf(id).toArray();
-    await messagesOf(id).delete();
+    await messageKeysOf(id).delete();
     await db.threads.delete(id);
     await deleteUnusedBlobs(rows.flatMap((row) => row.blobs));
   });
@@ -209,25 +279,23 @@ export function deleteThread(id: string) {
 
 /** Exports all chats with their attachments embedded, independent of the database layout. */
 export async function exportThreads(): Promise<z.infer<typeof backupSchema>> {
-  const threads = await listThreads();
-  // parsed so that the export contains exactly what an import accepts
-  return backupSchema.parse({
-    app: "bearchat",
-    version: 1,
-    threads: await Promise.all(
-      threads.map(async (thread) => ({
-        ...thread,
-        messages: await Promise.all(
-          (await loadThread(thread.id)).messages.map((message) =>
-            mapContentURLsAsync(message, async (url) => {
-              const data = await loadBlob(url);
-              return dataURL(data.type, await data.bytes());
-            }),
-          ),
-        ),
-      })),
-    ),
+  // content shared by several messages is encoded once
+  const encode = memoize(async (url: string) => {
+    const data = await loadBlob(url);
+    return dataURL(data.type, await data.bytes());
   });
+  // one chat at a time, so that only one chat's messages are loaded besides the export itself
+  const threads = await Array.fromAsync(await listThreads(), async (thread) => ({
+    ...thread,
+    messages: await Promise.all(
+      (await loadThread(thread.id)).messages.map((message) =>
+        mapContentURLsAsync(message, encode),
+      ),
+    ),
+  }));
+
+  // parsed so that the export contains exactly what an import accepts
+  return backupSchema.parse({ app: "bearchat", version: 1, threads });
 }
 
 /** Imports a backup, replacing chats with the same id. */

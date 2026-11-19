@@ -1,7 +1,7 @@
 import { useChat } from "@ai-sdk/react";
 import { type FileUIPart, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { MessageSquareIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ChatMessageView } from "@/components/chat-message";
 import { PromptForm } from "@/components/prompt-form";
@@ -24,21 +24,26 @@ import {
 } from "@/components/ui/message-scroller";
 import { toast } from "@/components/ui/toast";
 import { TraceLine, TraceTitle } from "@/components/ui/trace";
+import { useStableCallback } from "@/hooks/use-stable-callback";
 import { type ChatMessage, continueRequest, createTransport } from "@/lib/chat";
 import { config } from "@/lib/config";
 import type { Session } from "@/lib/connection";
-import { type LoadedThread, saveThread, updateThread } from "@/lib/threads";
-import type { PromptMessages } from "@/lib/mcp";
+import { type PromptMessages, type ServerErrorHandler, serverTools } from "@/lib/mcp";
+import { type LoadedThread, saveThread, threadSaver, updateThread } from "@/lib/threads";
 import { openThread, type Route } from "@/lib/route";
 import { chatSettingsSchema, metadataSchema } from "@/lib/schemas";
-import {
-  type ResolvedSettings,
-  resolveSettings,
-  type Settings,
-  updateUserSettings,
-  useUserSettings,
-} from "@/lib/settings";
-import { now } from "@/lib/utils";
+import { type Settings, updateUserSettings, useChatSettings } from "@/lib/settings";
+import { errorMessage, now } from "@/lib/utils";
+
+// Streamed text arrives in many small chunks, so the chat re-renders at most this often while it streams.
+const renderInterval = 50;
+
+const reportServerError: ServerErrorHandler = (server, error) =>
+  toast.add({
+    type: "error",
+    title: `The MCP server ${server} is unavailable`,
+    description: errorMessage(error),
+  });
 
 interface ThreadProps {
   route: Route;
@@ -60,21 +65,19 @@ export function Thread({
     }
   }, [initial.skipped]);
   const [chatSettings, setChatSettings] = useState(initial.settings);
-  const resolved = resolveSettings(useUserSettings(), chatSettings);
-  // the chat's or user's model may no longer be served
-  const settings: ResolvedSettings = {
-    ...resolved,
-    model: models.find((model) => model.id === resolved.model)?.id ?? models[0].id,
-  };
+  const settings = useChatSettings(chatSettings, models);
   const snapshot = chatSettingsSchema.parse(settings);
 
-  // the first save creates the chat, later ones only update it, so a deleted chat stays deleted
-  const stored = useRef(initial.exists);
+  // Connects to the MCP servers before the first message, whose request reports the servers that cannot be reached.
+  useEffect(() => {
+    void serverTools(settings, () => undefined);
+  }, [settings]);
+
+  const [save] = useState(() => threadSaver(id, initial));
 
   const persist = (messages: ChatMessage[]) => {
     if (!temporary) {
-      void saveThread(id, snapshot, messages, !stored.current);
-      stored.current = true;
+      void save(snapshot, messages);
     }
   };
 
@@ -91,7 +94,8 @@ export function Thread({
     id,
     messages: initial.messages,
     messageMetadataSchema: metadataSchema,
-    transport: createTransport(connection, settings, id),
+    transport: createTransport(connection, settings, id, reportServerError),
+    throttle: renderInterval,
     // resumes the agent once every pending tool call has been approved or denied
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     // also called after errors and aborts, so partial responses are kept
@@ -116,21 +120,32 @@ export function Thread({
   const send = (text: string, files: FileUIPart[], messageId?: string) =>
     void sendMessage({ text, files, messageId, metadata: { createdAt: now() } });
 
-  const fork = (index: number) => {
-    const forkId = crypto.randomUUID();
-    void saveThread(forkId, snapshot, messages.slice(0, index + 1), true).then(() =>
-      openThread(forkId),
-    );
-  };
-
   // edits outside of a request, which the chat's onFinish does not see
   const replace = (next: ChatMessage[]) => {
     setMessages(next);
     persist(next);
   };
 
-  const remove = (messageId: string) =>
-    replace(messages.filter((message) => message.id !== messageId));
+  // The actions of messages keep their identity while a reply streams, so that only the streaming message re-renders.
+  const retry = useStableCallback((messageId: string) => void regenerate({ messageId }));
+  const continueReply = useStableCallback(() => void sendMessage(undefined, continueRequest));
+  const edit = useStableCallback((messageId: string, text: string, files: FileUIPart[]) =>
+    send(text, files, messageId),
+  );
+  const approve = useStableCallback(
+    (approvalId: string, approved: boolean) =>
+      void addToolApprovalResponse({ id: approvalId, approved }),
+  );
+
+  const fork = useStableCallback((messageId: string) => {
+    const forkId = crypto.randomUUID();
+    const end = messages.findIndex((message) => message.id === messageId) + 1;
+    void saveThread(forkId, snapshot, messages.slice(0, end)).then(() => openThread(forkId));
+  });
+
+  const remove = useStableCallback((messageId: string) =>
+    replace(messages.filter((message) => message.id !== messageId)),
+  );
 
   const insert = (inserted: PromptMessages) =>
     replace([
@@ -176,14 +191,12 @@ export function Thread({
                     streaming={status === "streaming" && index === messages.length - 1}
                     busy={busy}
                     last={index === messages.length - 1}
-                    onRetry={() => void regenerate({ messageId: message.id })}
-                    onContinue={() => void sendMessage(undefined, continueRequest)}
-                    onEdit={(text, files) => send(text, files, message.id)}
-                    onFork={() => fork(index)}
-                    onDelete={() => remove(message.id)}
-                    onApprove={(approvalId, approved) =>
-                      void addToolApprovalResponse({ id: approvalId, approved })
-                    }
+                    onRetry={retry}
+                    onContinue={continueReply}
+                    onEdit={edit}
+                    onFork={fork}
+                    onDelete={remove}
+                    onApprove={approve}
                   />
                 </MessageScrollerItem>
               ))}

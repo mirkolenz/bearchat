@@ -22,7 +22,7 @@ import {
   WrenchIcon,
   XIcon,
 } from "lucide-react";
-import { type ComponentProps, type FormEvent, useState } from "react";
+import { type ComponentProps, type FormEvent, memo, useState } from "react";
 
 import { Hint } from "@/components/hint";
 import { Markdown } from "@/components/markdown";
@@ -60,20 +60,22 @@ import { speak } from "@/lib/speech";
 import { type ContentResult, contentResultSchema } from "@/lib/tools/content";
 import { cn, compactNumber, secondsBetween } from "@/lib/utils";
 
+// The actions take the message's id, so that all messages share them.
 interface ChatMessageViewProps {
   message: ChatMessage;
   streaming: boolean;
   busy: boolean;
   last: boolean;
-  onRetry: () => void;
+  onRetry: (messageId: string) => void;
   onContinue: () => void;
-  onEdit: (text: string, files: FileUIPart[]) => void;
-  onFork: () => void;
-  onDelete: () => void;
-  onApprove: (id: string, approved: boolean) => void;
+  onEdit: (messageId: string, text: string, files: FileUIPart[]) => void;
+  onFork: (messageId: string) => void;
+  onDelete: (messageId: string) => void;
+  onApprove: (approvalId: string, approved: boolean) => void;
 }
 
-export function ChatMessageView({
+// Memoized, so that only the streaming message re-renders while a reply streams.
+export const ChatMessageView = memo(function ChatMessageView({
   message,
   streaming,
   busy,
@@ -98,7 +100,7 @@ export function ChatMessageView({
         onCancel={() => setEditing(false)}
         onSave={(nextText, nextFiles) => {
           setEditing(false);
-          onEdit(nextText, nextFiles);
+          onEdit(message.id, nextText, nextFiles);
         }}
       />
     );
@@ -156,7 +158,7 @@ export function ChatMessageView({
               </Action>
             ) : (
               <>
-                <Action label="Retry" disabled={busy} onClick={onRetry}>
+                <Action label="Retry" disabled={busy} onClick={() => onRetry(message.id)}>
                   <RefreshCwIcon />
                 </Action>
                 {last && (
@@ -166,10 +168,10 @@ export function ChatMessageView({
                 )}
               </>
             )}
-            <Action label="Fork into a new chat" disabled={busy} onClick={onFork}>
+            <Action label="Fork into a new chat" disabled={busy} onClick={() => onFork(message.id)}>
               <GitForkIcon />
             </Action>
-            <Action label="Delete" disabled={busy} onClick={onDelete}>
+            <Action label="Delete" disabled={busy} onClick={() => onDelete(message.id)}>
               <Trash2Icon />
             </Action>
             {message.metadata?.model && <MessageDetails message={message} />}
@@ -177,7 +179,7 @@ export function ChatMessageView({
       </MessageContent>
     </Message>
   );
-}
+});
 
 function Action({ label, ...props }: ComponentProps<typeof Button> & { label: string }) {
   return (

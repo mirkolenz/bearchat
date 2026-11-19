@@ -1,16 +1,39 @@
 // One conversion for everything the model reads from files, be it attachments, MCP resources or stored files:
 // images become downscaled JPEGs, documents Markdown, text stays text, and anything else is rejected.
-import { decodeText, errorMessage, lazy } from "@/lib/utils";
+import type { DocumentResult } from "@/lib/convert-worker";
+import { decodeText } from "@/lib/utils";
 
 // Longest image side, larger photos are downscaled before they are sent and stored.
 const maxImageSide = 2048;
 
-// anydoc is loaded on first use, since its WebAssembly build is large.
-const loadAnydoc = lazy(async () => {
-  const module = await import("@firecrawl/anydoc-wasm");
-  await module.default();
-  return module;
-});
+// started on first use and kept, so that anydoc, whose WebAssembly build is large, loads once
+let documentWorker: Worker | undefined;
+
+/** Converts a document to Markdown in the worker. */
+async function convertDocument(bytes: Uint8Array<ArrayBuffer>): Promise<DocumentResult> {
+  const worker = (documentWorker ??= new Worker(new URL("./convert-worker.ts", import.meta.url), {
+    type: "module",
+  }));
+  const { port1, port2 } = new MessageChannel();
+  const done = new AbortController();
+
+  try {
+    return await new Promise<DocumentResult>((resolve, reject) => {
+      port1.onmessage = ({ data }: MessageEvent<DocumentResult>) => resolve(data);
+      // e.g. if the worker cannot be loaded
+      worker.addEventListener(
+        "error",
+        (event) => reject(new Error(event.message || "The document converter failed to load")),
+        { signal: done.signal },
+      );
+      // the bytes are moved instead of copied, since the caller is done with them
+      worker.postMessage(bytes, [port2, bytes.buffer]);
+    });
+  } finally {
+    done.abort();
+    port1.close();
+  }
+}
 
 export function dataURL(mediaType: string, bytes: Uint8Array) {
   return `data:${mediaType};base64,${bytes.toBase64()}`;
@@ -83,16 +106,15 @@ export async function convertFile(file: File): Promise<File> {
     return textFile(file.name, bytes);
   }
 
-  const { formatFromBytes, toMarkdownBytes } = await loadAnydoc();
-  const format = formatFromBytes(bytes);
+  const result = await convertDocument(bytes);
 
-  if (format === undefined) {
+  if ("unsupported" in result) {
     throw new Error(`${file.name} is not an image, document or text file`);
   }
 
-  try {
-    return textFile(withExtension(file.name, "md"), toMarkdownBytes(bytes, format));
-  } catch (error) {
-    throw new Error(`${file.name} could not be converted: ${errorMessage(error)}`);
+  if ("error" in result) {
+    throw new Error(`${file.name} could not be converted: ${result.error}`);
   }
+
+  return textFile(withExtension(file.name, "md"), result.markdown);
 }

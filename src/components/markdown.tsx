@@ -1,21 +1,25 @@
-import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
-import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
-import { Streamdown } from "streamdown";
-import "katex/dist/katex.min.css";
-import "streamdown/styles.css";
+import type { renderMarkdown } from "@/components/markdown-renderer";
+import { createStore } from "@/lib/store";
+import { lazy } from "@/lib/utils";
 
-import { isTouchScreen } from "@/lib/pointer";
+export interface MarkdownProps {
+  children: string;
+  streaming: boolean;
+}
 
-const plugins = { cjk, code, math, mermaid };
-// Panning a diagram with a finger would capture the scrolling of the chat, pinch zoom still enlarges it.
-const controls = { mermaid: { panZoom: !isTouchScreen() } };
+const renderer = createStore<typeof renderMarkdown | undefined>(undefined);
 
-export function Markdown({ children, streaming }: { children: string; streaming: boolean }) {
-  return (
-    <Streamdown plugins={plugins} controls={controls} isAnimating={streaming} animated>
-      {children}
-    </Streamdown>
+/** Loads the Markdown renderer, which is large, so that the app can render before it is downloaded. */
+export const loadMarkdown = lazy(async () => {
+  renderer.set((await import("@/components/markdown-renderer")).renderMarkdown);
+});
+
+/** Markdown, shown as plain text until the renderer is loaded. */
+export function Markdown(props: MarkdownProps) {
+  const render = renderer.useValue();
+  return render === undefined ? (
+    <div className="whitespace-pre-wrap">{props.children}</div>
+  ) : (
+    render(props)
   );
 }
