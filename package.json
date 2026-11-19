@@ -26,7 +26,7 @@
     "class-variance-authority": "^0.7",
     "cn": "^0.5",
     "dexie": "^4",
-    "katex": "^0.16",
+    "katex": "^0.19",
     "lucide-react": "^1",
     "react": "^19",
     "react-dom": "^19",
@@ -46,6 +46,10 @@
     "@vitejs/plugin-react": "^6",
     "oxc-transform-react": "^0.156",
     "vite": "^8"
+  },
+  "overrides": {
+    "katex": "$katex",
+    "marked": "^18"
   },
   "engines": {
     "node": ">=26"
