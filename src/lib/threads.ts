@@ -1,9 +1,4 @@
-import {
-  isFileUIPart,
-  isToolUIPart,
-  safeValidateUIMessages,
-  validateUIMessages,
-} from "ai";
+import { isFileUIPart, isToolUIPart, safeValidateUIMessages, validateUIMessages } from "ai";
 import { Dexie, liveQuery } from "dexie";
 import type { z } from "zod";
 
@@ -15,8 +10,7 @@ import { backupSchema, chatSettingsSchema, metadataSchema, threadSchema } from "
 import type { ChatSettings } from "@/lib/settings";
 import { createStore } from "@/lib/store";
 import { contentResultSchema } from "@/lib/tools/content";
-import { memoize, now } from "@/lib/utils";
-
+import { exclusive, memoize, now } from "@/lib/utils";
 
 const importedSettingsSchema = chatSettingsSchema.omit({ mode: true });
 
@@ -79,7 +73,9 @@ async function mapContentURLsAsync(
   map: (url: string) => Promise<string>,
 ): Promise<ChatMessage> {
   const urls = [...new Set(contentURLs(message))];
-  const mapped = new Map(await Promise.all(urls.map(async (url) => [url, await map(url)] as const)));
+  const mapped = new Map(
+    await Promise.all(urls.map(async (url) => [url, await map(url)] as const)),
+  );
   return mapContentURLs(message, (url) => mapped.get(url) ?? url);
 }
 
@@ -87,49 +83,60 @@ function blobHashes(message: ChatMessage): string[] {
   return contentURLs(message).flatMap((url) => blobHash(url) ?? []);
 }
 
+/** What a writer last saw of a chat. */
+interface Base {
+  // the stored revision, undefined for a chat the writer creates
+  revision?: number;
+  // the messages of that revision, undefined if unknown, which writes all messages
+  messages?: readonly ChatMessage[];
+}
+
 /**
- * Replaces a chat and its messages in one transaction, which also stores the blobs they reference.
- * The chat is built from the stored one, if any, and only created when asked to.
- * Given the messages of the last save, only the messages that were replaced since are written,
+ * Replaces a chat and its messages in one transaction, which also stores the blobs they reference,
+ * and resolves to the new revision, or undefined if the chat was not written.
+ * The chat is built from the stored one, if any, and only created by a writer that saw no revision.
+ * Given the revision the writer saw, only the messages that were replaced since are written,
  * since the chat replaces a message object whenever it changes.
+ * If another writer saved in between, all messages are written instead.
  */
 function writeThread(
   id: string,
   messages: readonly ChatMessage[],
-  create: boolean,
   build: (existing: Thread | undefined) => Thread,
-  saved?: readonly ChatMessage[],
-) {
-  const rows: MessageRow[] = messages.flatMap((message, position) =>
-    saved?.[position] === message
-      ? []
-      : [{ ...message, threadId: id, position, blobs: blobHashes(message) }],
-  );
-  // the saved messages that are replaced or removed
-  const stale = saved?.filter((message, position) => messages[position] !== message);
-
+  base: Base = {},
+): Promise<number | undefined> {
   return db.transaction("rw", db.threads, db.messages, db.blobs, async () => {
     const existing = await db.threads.get(id);
 
     // a late save of a deleted chat, e.g. of its aborted response, must not restore it
-    if (existing === undefined && !create) {
-      return;
+    if (existing === undefined && base.revision !== undefined) {
+      return undefined;
     }
 
-    await db.threads.put(build(existing));
+    const previous = existing?.revision ?? 0;
+    const saved = base.revision === previous ? base.messages : undefined;
+    const rows: MessageRow[] = messages.flatMap((message, position) =>
+      saved?.[position] === message
+        ? []
+        : [{ ...message, threadId: id, position, blobs: blobHashes(message) }],
+    );
     let dropped: string[];
 
-    if (stale === undefined) {
+    if (saved === undefined) {
       dropped = (await messagesOf(id).toArray()).flatMap((row) => row.blobs);
       await messageKeysOf(id).delete();
     } else {
+      // the saved messages that are replaced or removed
+      const stale = saved.filter((message, position) => messages[position] !== message);
       dropped = stale.flatMap(blobHashes);
       await db.messages.bulkDelete(stale.map((message) => [id, message.id]));
     }
 
+    await db.threads.put({ ...build(existing), revision: previous + 1 });
     await persistBlobs(rows.flatMap((row) => row.blobs));
     await db.messages.bulkPut(rows);
     await deleteUnusedBlobs(dropped);
+    return previous + 1;
   });
 }
 
@@ -172,13 +179,13 @@ export async function loadThread(id: string) {
   // only a chat with invalid messages is validated message by message, to keep the valid ones
   const messages = all.success
     ? all.data
-    : (await Promise.all(stored.map((message) => validate([message])))).flatMap(
-        (result) => (result.success ? result.data : []),
+    : (await Promise.all(stored.map((message) => validate([message])))).flatMap((result) =>
+        result.success ? result.data : [],
       );
   return {
     messages,
-    // whether the chat is stored, which new and deleted chats are not
-    exists: thread !== undefined,
+    // undefined if the chat is not stored, which new and deleted chats are not
+    revision: thread === undefined ? undefined : (thread.revision ?? 0),
     // invalid chat settings are dropped, so the chat falls back to the user settings
     settings: chatSettingsSchema.safeParse(thread?.settings).data ?? {},
     skipped: rows.length - messages.length,
@@ -222,14 +229,12 @@ function writeChat(
   id: string,
   settings: ChatSettings,
   messages: readonly ChatMessage[],
-  create: boolean,
-  saved?: readonly ChatMessage[],
+  base?: Base,
 ) {
   const time = now();
   return writeThread(
     id,
     messages,
-    create,
     (existing) => ({
       id,
       title: existing?.title ?? deriveTitle(messages),
@@ -237,31 +242,36 @@ function writeChat(
       updatedAt: time,
       settings,
     }),
-    saved,
+    base,
   );
 }
 
 /** Saves a new chat, such as a fork. */
 export function saveThread(id: string, settings: ChatSettings, messages: readonly ChatMessage[]) {
-  return writeChat(id, settings, messages, true);
+  return writeChat(id, settings, messages);
 }
 
 /**
  * Saves the loaded chat whenever it changed, writing only the messages that changed since the last save.
  * The first save creates the chat, later ones only update it, so that a chat deleted meanwhile stays deleted.
+ * Saves of a chat run one at a time, also across tabs, so a slow save never overwrites a later one.
  */
 export function threadSaver(id: string, loaded: LoadedThread) {
-  let exists = loaded.exists;
-  // What the database holds, which is unknown if messages were skipped, since their positions are still taken.
-  // It only advances once a save is committed, so a failed save is repeated by the next one.
-  let saved: readonly ChatMessage[] | undefined = loaded.skipped === 0 ? loaded.messages : undefined;
-
-  return async (settings: ChatSettings, messages: readonly ChatMessage[]) => {
-    const create = !exists;
-    exists = true;
-    await writeChat(id, settings, messages, create, saved);
-    saved = messages;
+  // Only advances once a save is committed, so a failed save is repeated by the next one.
+  // The messages are unknown if some were skipped, since their positions are still taken.
+  let base: Base = {
+    revision: loaded.revision,
+    messages: loaded.skipped === 0 ? loaded.messages : undefined,
   };
+
+  return (settings: ChatSettings, messages: readonly ChatMessage[]) =>
+    exclusive(`thread:${id}`, async () => {
+      const revision = await writeChat(id, settings, messages, base);
+
+      if (revision !== undefined) {
+        base = { revision, messages };
+      }
+    });
 }
 
 export function updateThread(id: string, patch: Partial<Pick<Thread, "title" | "settings">>) {
@@ -288,14 +298,30 @@ export async function exportThreads(): Promise<z.infer<typeof backupSchema>> {
   const threads = await Array.fromAsync(await listThreads(), async (thread) => ({
     ...thread,
     messages: await Promise.all(
-      (await loadThread(thread.id)).messages.map((message) =>
-        mapContentURLsAsync(message, encode),
-      ),
+      (await loadThread(thread.id)).messages.map((message) => mapContentURLsAsync(message, encode)),
     ),
   }));
 
   // parsed so that the export contains exactly what an import accepts
   return backupSchema.parse({ app: "bearchat", version: 1, threads });
+}
+
+/** Denies the approved tool calls that have not run yet, which the next request would otherwise run. */
+function denyApprovals(message: ChatMessage): ChatMessage {
+  const parts = message.parts.map((part) =>
+    isToolUIPart(part) && part.state === "approval-responded"
+      ? {
+          ...part,
+          state: "output-denied" as const,
+          approval: {
+            ...part.approval,
+            approved: false as const,
+            reason: "Approvals of imported chats do not carry over",
+          },
+        }
+      : part,
+  );
+  return { ...message, parts };
 }
 
 /** Imports a backup, replacing chats with the same id. */
@@ -323,13 +349,13 @@ export async function importThreads(data: unknown): Promise<number> {
       // a shared backup must not grant tool permissions, so chats use the user's execution mode
       return {
         thread: { ...thread, settings: importedSettingsSchema.parse(settings) },
-        messages: stored,
+        messages: stored.map(denyApprovals),
       };
     }),
   );
 
   for (const { thread, messages } of threads) {
-    await writeThread(thread.id, messages, true, () => thread);
+    await writeThread(thread.id, messages, () => thread);
   }
 
   return threads.length;

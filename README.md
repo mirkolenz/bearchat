@@ -121,6 +121,6 @@ For other web servers, [`nix/module.nix`](nix/module.nix) shows the required rou
 - Since the login request carries a custom header, browsers refuse to send it from other sites.
 - In cookie mode, every page of the same origin can use the session, so serve BearChat from a host without other apps.
 - `config.json` is for convenience, not access control, so access to models has to be enforced by the inference server.
-- Imported chats never carry a tool execution mode, so a shared backup cannot approve tools on its own.
+- Imported chats never carry a tool execution mode, and their approved but unexecuted tool calls are denied, so a shared backup cannot approve tools on its own.
 - MCP tools are prefixed with their server name, such as `docs__search`, so no tool can replace another or inherit its approval.
 - Dictation only runs on-device, so audio never leaves the browser.

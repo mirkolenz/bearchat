@@ -1,3 +1,4 @@
+import { threadSchema } from "@/lib/schemas";
 import { createStore } from "@/lib/store";
 import { type LoadedThread, loadThread } from "@/lib/threads";
 
@@ -18,7 +19,12 @@ const page = createStore<Page | undefined>(undefined);
 // the chat being opened, which the sidebar marks while it loads
 const target = createStore<Route | undefined>(undefined);
 // new chats have nothing to load, so they are shown at once
-const newThread: LoadedThread = { messages: [], exists: false, settings: {}, skipped: 0 };
+const newThread: LoadedThread = {
+  messages: [],
+  revision: undefined,
+  settings: {},
+  skipped: 0,
+};
 
 function routeURL(route: Route): string {
   const url = new URL(location.href);
@@ -30,8 +36,9 @@ function routeURL(route: Route): string {
 
 function parseRoute(href: string): Route | undefined {
   const params = new URL(href).searchParams;
-  const id = params.get("chat");
-  return id === null ? undefined : { id, temporary: params.has("temporary") };
+  // chats are listed only with valid ids, so any other id starts a new chat
+  const id = threadSchema.shape.id.safeParse(params.get("chat"));
+  return id.success ? { id: id.data, temporary: params.has("temporary") } : undefined;
 }
 
 function publish(next: Page) {

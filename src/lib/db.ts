@@ -6,6 +6,12 @@ import type { threadSchema } from "@/lib/schemas";
 
 export type Thread = z.infer<typeof threadSchema>;
 
+// A chat as stored, whose revision counts the saves of its messages, so a save notices writes of others.
+// Rows of earlier versions have none, which counts as zero.
+export interface ThreadRow extends Thread {
+  revision?: number;
+}
+
 // A message as the chat holds it, whose binary content references blobs.
 export interface MessageRow extends ChatMessage {
   threadId: string;
@@ -21,7 +27,7 @@ interface BlobRow {
 }
 
 class Database extends Dexie {
-  declare threads: EntityTable<Thread, "id">;
+  declare threads: EntityTable<ThreadRow, "id">;
   declare messages: Table<MessageRow, [string, string]>;
   declare blobs: EntityTable<BlobRow, "hash">;
 
