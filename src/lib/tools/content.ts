@@ -1,9 +1,10 @@
 import type { CallToolResult } from "@ai-sdk/mcp";
-import type { Tool } from "ai";
+import { isDeepEqualData, type Tool } from "ai";
 import { z } from "zod";
 
 import { storeFile } from "@/lib/blobs";
 import { convertFile } from "@/lib/convert";
+import { jsonSchema } from "@/lib/schemas";
 
 const textPartSchema = z.object({ type: z.literal("text"), text: z.string() });
 const imagePartSchema = z.object({
@@ -29,7 +30,10 @@ type ContentPart = ContentResult["content"][number];
 type ModelOutput = Awaited<ReturnType<NonNullable<Tool["toModelOutput"]>>>;
 
 // MCP results as upstream returns them, validated by the MCP client, or structured content
-const mcpResultSchema = z.object({ content: z.array(z.looseObject({ type: z.string() })) });
+const mcpResultSchema = z.object({
+  content: z.array(z.looseObject({ type: z.string() })),
+  structuredContent: z.unknown(),
+});
 type McpPart = z.infer<typeof mcpResultSchema>["content"][number];
 
 /** Converts and stores an image like an attachment, so tool results hold the same images as messages. */
@@ -68,7 +72,8 @@ export function contentModelOutput({ content }: ContentResult): ModelOutput {
 
 /**
  * An MCP tool whose results have their images stored instead of embedded,
- * and other results such as structured content as JSON text.
+ * and other results as JSON text. Structured content is added as JSON text,
+ * unless a text part already holds it, as the MCP spec recommends.
  */
 export function mcpContentTool(tool: Tool): Tool {
   const { execute } = tool;
@@ -79,10 +84,24 @@ export function mcpContentTool(tool: Tool): Tool {
       (async (input, options): Promise<ContentResult> => {
         const output: unknown = await execute(input, options);
         const result = mcpResultSchema.safeParse(output);
+
+        if (!result.success) {
+          return { content: [{ type: "text", text: JSON.stringify(output) }] };
+        }
+
+        const { structuredContent } = result.data;
+        const content = await Promise.all(result.data.content.map(mcpPart));
+        const included =
+          structuredContent === undefined ||
+          content.some(
+            (part) =>
+              part.type === "text" &&
+              isDeepEqualData(jsonSchema.safeParse(part.text).data, structuredContent),
+          );
         return {
-          content: result.success
-            ? await Promise.all(result.data.content.map(mcpPart))
-            : [{ type: "text", text: JSON.stringify(output) }],
+          content: included
+            ? content
+            : [...content, { type: "text", text: JSON.stringify(structuredContent) }],
         };
       }),
     toModelOutput: ({ output }) => contentModelOutput(contentResultSchema.parse(output)),

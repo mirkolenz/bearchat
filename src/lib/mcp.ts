@@ -93,13 +93,13 @@ async function listTools(url: string): Promise<ToolListing> {
   };
 }
 
-/** The server's tools, where an expired listing is used once more while it is refreshed in the background. */
+/** The server's tools, listed again once expired, since a tool may have gained side effects meanwhile. */
 async function toolListing(url: string): Promise<ToolListing> {
   const cached = toolListings.get(url);
 
   if (cached === undefined) {
     const pending = listTools(url);
-    pending.catch(() => toolListings.delete(url));
+    pending.catch(() => toolListings.get(url) === pending && toolListings.delete(url));
     toolListings.set(url, pending);
     return pending;
   }
@@ -107,15 +107,18 @@ async function toolListing(url: string): Promise<ToolListing> {
   const listing = await cached;
 
   if (
-    listing.expires !== undefined &&
-    Temporal.Instant.compare(Temporal.Now.instant(), listing.expires) >= 0 &&
-    toolListings.get(url) === cached
+    listing.expires === undefined ||
+    Temporal.Instant.compare(Temporal.Now.instant(), listing.expires) < 0
   ) {
-    // a failed refresh keeps the expired listing, so the next use retries
-    toolListings.set(url, listTools(url).catch(() => listing));
+    return listing;
   }
 
-  return listing;
+  // concurrent callers share one refresh
+  if (toolListings.get(url) === cached) {
+    toolListings.delete(url);
+  }
+
+  return toolListing(url);
 }
 
 /** Closes the server's client and drops its tools, so that the next use connects again. */
@@ -215,6 +218,7 @@ export async function listResources(servers: McpServer[]) {
   const listed = await eachServer(servers, "resources", async (mcp, server) => {
     const [pages, templates] = await Promise.all([
       allPages((cursor) => mcp.listResources({ params: { cursor }, options: requestOptions })),
+      // only the first page, since the AI SDK's client takes no cursor for templates
       mcp
         .listResourceTemplates({ options: requestOptions })
         .catch(() => ({ resourceTemplates: [] })),

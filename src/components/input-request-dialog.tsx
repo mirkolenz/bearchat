@@ -73,6 +73,25 @@ const inputTypes = {
   "date-time": "datetime-local",
 } as const;
 
+// datetime-local inputs hold a time without the offset that RFC 3339 requires, which is the user's time zone
+const localDateTime = {
+  toInput: (value: string) => {
+    try {
+      return Temporal.Instant.from(value)
+        .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+        .toPlainDateTime()
+        .toString({ smallestUnit: "minute" });
+    } catch {
+      // a default that is no valid date-time leaves the field empty
+      return undefined;
+    }
+  },
+  fromInput: (value: string) =>
+    Temporal.PlainDateTime.from(value)
+      .toZonedDateTime(Temporal.Now.timeZoneId())
+      .toString({ timeZoneName: "never" }),
+};
+
 /** The options of an enum, from plain values with optional names or from titled constants. */
 function choices(values?: string[], names?: string[], titled?: z.infer<typeof choiceSchema>[]) {
   return (
@@ -96,7 +115,12 @@ function readValue(data: FormData, key: string, property: Property): unknown {
     }
     case "string": {
       const value = data.get(key);
-      return typeof value === "string" && value !== "" ? value : undefined;
+
+      if (typeof value !== "string" || value === "") {
+        return undefined;
+      }
+
+      return property.format === "date-time" ? localDateTime.fromInput(value) : value;
     }
   }
 }
@@ -167,7 +191,11 @@ function PropertyField({
               required={required}
               minLength={property.minLength}
               maxLength={property.maxLength}
-              defaultValue={property.default}
+              defaultValue={
+                property.format === "date-time" && property.default !== undefined
+                  ? localDateTime.toInput(property.default)
+                  : property.default
+              }
             />
           )}
           {description}
