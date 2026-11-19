@@ -32,6 +32,7 @@ export const settingsSchema = z.object({
   requestBody: z.record(z.string(), z.json()),
   pythonTool: z.boolean(),
   fileTools: z.boolean(),
+  chatTools: z.boolean(),
   mcpServers: z.record(
     mcpServerNameSchema,
     z.object({ url: mcpServerURLSchema, enabled: z.boolean().default(true) }),
@@ -96,6 +97,6 @@ export const threadSchema = z.object({
 /** Exported chats, whose messages are AI SDK UI messages with attachments embedded as data URLs. */
 export const backupSchema = z.strictObject({
   app: z.literal("bearchat"),
-  version: z.literal(2),
+  version: z.literal(1),
   threads: z.array(threadSchema.extend({ messages: z.array(z.unknown()) })),
 });

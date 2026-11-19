@@ -54,9 +54,11 @@ import {
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
+import { useBlobURL } from "@/lib/blobs";
 import { type ChatMessage, messageText } from "@/lib/chat";
 import { speak } from "@/lib/speech";
-import { cn, compactNumber } from "@/lib/utils";
+import { type ContentResult, contentResultSchema } from "@/lib/tools/content";
+import { cn, compactNumber, secondsBetween } from "@/lib/utils";
 
 interface ChatMessageViewProps {
   message: ChatMessage;
@@ -189,11 +191,11 @@ function MessageDetails({ message }: { message: ChatMessage }) {
   }
 
   if (firstTokenAt !== undefined && finishedAt !== undefined && outputTokens !== undefined) {
-    details.push(`${(outputTokens / ((finishedAt - firstTokenAt) / 1000)).toFixed(1)} tok/s`);
+    details.push(`${(outputTokens / secondsBetween(firstTokenAt, finishedAt)).toFixed(1)} tok/s`);
   }
 
   if (createdAt !== undefined && firstTokenAt !== undefined) {
-    details.push(`${((firstTokenAt - createdAt) / 1000).toFixed(1)} s to first token`);
+    details.push(`${secondsBetween(createdAt, firstTokenAt).toFixed(1)} s to first token`);
   }
 
   return <span className="ml-1 truncate">{details.join(" · ")}</span>;
@@ -204,6 +206,10 @@ interface AttachmentsProps {
   onRemove?: (index: number) => void;
 }
 
+function BlobImage({ url, alt, className }: { url: string; alt: string; className?: string }) {
+  return <img src={useBlobURL(url)} alt={alt} className={className} />;
+}
+
 export function Attachments({ files, onRemove }: AttachmentsProps) {
   return (
     <AttachmentGroup>
@@ -211,7 +217,7 @@ export function Attachments({ files, onRemove }: AttachmentsProps) {
         <Attachment key={index} orientation="vertical" size="sm">
           {file.mediaType.startsWith("image/") ? (
             <AttachmentMedia variant="image">
-              <img src={file.url} alt={file.filename ?? "Attachment"} />
+              <BlobImage url={file.url} alt={file.filename ?? "Attachment"} />
             </AttachmentMedia>
           ) : (
             <>
@@ -253,17 +259,33 @@ interface ToolValueProps {
 }
 
 function ToolValue({ label, value, className }: ToolValueProps) {
+  const result = contentResultSchema.safeParse(value);
+  const parts: ContentResult["content"] = result.success
+    ? result.data.content
+    : [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value, null, 2) }];
   return (
     <section className="flex flex-col gap-1">
       <h4 className="text-xs font-medium text-muted-foreground">{label}</h4>
-      <pre
-        className={cn(
-          "max-h-64 overflow-auto rounded-md bg-muted p-2 font-mono text-xs whitespace-pre-wrap",
-          className,
-        )}
-      >
-        {typeof value === "string" ? value : JSON.stringify(value, null, 2)}
-      </pre>
+      {parts.map((part, index) =>
+        part.type === "text" ? (
+          <pre
+            key={index}
+            className={cn(
+              "max-h-64 overflow-auto rounded-md bg-muted p-2 font-mono text-xs whitespace-pre-wrap",
+              className,
+            )}
+          >
+            {part.text}
+          </pre>
+        ) : (
+          <BlobImage
+            key={index}
+            url={part.uri}
+            alt={part.name}
+            className="max-h-64 self-start rounded-md"
+          />
+        ),
+      )}
     </section>
   );
 }

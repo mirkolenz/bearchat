@@ -32,7 +32,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { exportThreads, importThreads } from "@/lib/db";
+import { exportThreads, importThreads } from "@/lib/threads";
 import {
   mcpServerNameSchema,
   mcpServerURLSchema,
@@ -57,7 +57,12 @@ const tools = [
   {
     key: "fileTools",
     label: "Browser files",
-    description: "Reads and writes the text files shown in the Files tab.",
+    description: "Reads, writes and edits the files shown in the Files tab, including its images.",
+  },
+  {
+    key: "chatTools",
+    label: "Chat history",
+    description: "Searches and reads your other saved chats.",
   },
 ] as const satisfies { key: SettingKey; label: string; description: string }[];
 
@@ -198,7 +203,7 @@ function ChatData() {
   const download = async () => {
     const backup = await exportThreads();
     downloadFile(
-      `bearchat-${new Date().toISOString().slice(0, 10)}.json`,
+      `bearchat-${Temporal.Now.plainDateISO().toString()}.json`,
       JSON.stringify(backup),
       "application/json",
     );

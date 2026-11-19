@@ -48,7 +48,8 @@ import {
 } from "@/components/ui/sidebar";
 import { toMarkdown } from "@/lib/chat";
 import { config } from "@/lib/config";
-import { deleteThread, listThreads, loadThread, type Thread, updateThread } from "@/lib/db";
+import type { Thread } from "@/lib/db";
+import { deleteThread, listThreads, loadThread, updateThread } from "@/lib/threads";
 import { openTemporaryThread, openThread } from "@/lib/route";
 import { downloadFile } from "@/lib/utils";
 

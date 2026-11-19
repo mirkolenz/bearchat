@@ -7,9 +7,11 @@ import {
 import type { FileUIPart, TextUIPart, ToolSet } from "ai";
 import { z } from "zod";
 
-import { dataURL } from "@/lib/attachments";
+import { storeFile } from "@/lib/blobs";
+import { convertFile } from "@/lib/convert";
 import { requestInput } from "@/lib/elicitation";
 import type { Settings } from "@/lib/settings";
+import { mcpContentTool } from "@/lib/tools/content";
 
 // One client per URL, shared by every name the URL is listed under, so renaming or duplicating a server reuses it.
 // A failed connection is retried on the next use.
@@ -19,12 +21,13 @@ interface ToolListing {
   tools: ToolSet;
   // names of the server's tools that declare no side effects
   readOnly: ReadonlySet<string>;
-  expires: number;
+  // never without the server's ttlMs hint
+  expires?: Temporal.Instant;
 }
 
 // Tool lists are cached for as long as the server's ttlMs hint allows, or for the client's lifetime without one.
 const toolListings = new Map<string, Promise<ToolListing>>();
-const ttlSchema = z.number().nonnegative();
+const ttlSchema = z.int().nonnegative();
 
 async function connect(url: string): Promise<MCPClient> {
   const client = await createMCPClient({
@@ -69,20 +72,28 @@ async function listTools(url: string): Promise<ToolListing> {
   const definitions = { ...pages[0], tools: pages.flatMap((page) => page.tools) };
   const ttl = ttlSchema.safeParse(pages[0].ttlMs);
   return {
-    tools: mcp.toolsFromDefinitions(definitions),
+    tools: Object.fromEntries(
+      Object.entries(mcp.toolsFromDefinitions(definitions)).map(([name, tool]) => [
+        name,
+        mcpContentTool(tool),
+      ]),
+    ),
     readOnly: new Set(
       definitions.tools
         .filter((definition) => definition.annotations?.readOnlyHint)
         .map((definition) => definition.name),
     ),
-    expires: ttl.success ? Date.now() + ttl.data : Infinity,
+    expires: ttl.success ? Temporal.Now.instant().add({ milliseconds: ttl.data }) : undefined,
   };
 }
 
 async function toolListing(url: string): Promise<ToolListing> {
   const cached = toolListings.get(url);
 
-  if (cached !== undefined && (await cached).expires > Date.now()) {
+  const expires = cached && (await cached).expires;
+  const expired = expires !== undefined && Temporal.Instant.compare(Temporal.Now.instant(), expires) >= 0;
+
+  if (cached !== undefined && !expired) {
     return cached;
   }
 
@@ -212,58 +223,38 @@ export async function complete(
 type ResourceContents = Awaited<ReturnType<MCPClient["readResource"]>>["contents"][number];
 type PromptMessage = Awaited<ReturnType<MCPClient["getPrompt"]>>["messages"][number];
 
-/** Turns resource contents into parts the models can read: text files and images. */
-function resourceParts(contents: ResourceContents): FileUIPart[] {
-  const filename = contents.name ?? contents.uri;
+/** Converts MCP content the same way as an attached file. */
+async function convertedPart(content: BlobPart, name: string, type = ""): Promise<FileUIPart> {
+  return storeFile(await convertFile(new File([content], name, { type })));
+}
 
-  if (typeof contents.text === "string") {
-    return [
-      {
-        type: "file",
-        mediaType: "text/plain",
-        filename,
-        url: dataURL("text/plain", new TextEncoder().encode(contents.text)),
-      },
-    ];
+function resourcePart({ name, uri, mimeType, text, blob }: ResourceContents): Promise<FileUIPart> {
+  if (typeof text === "string") {
+    return convertedPart(text, name ?? uri, mimeType);
   }
 
-  if (typeof contents.blob === "string" && contents.mimeType?.startsWith("image/")) {
-    return [
-      {
-        type: "file",
-        mediaType: contents.mimeType,
-        filename,
-        url: `data:${contents.mimeType};base64,${contents.blob}`,
-      },
-    ];
+  if (typeof blob === "string") {
+    return convertedPart(Uint8Array.fromBase64(blob), name ?? uri, mimeType);
   }
 
-  throw new Error(`${filename} has the unsupported type ${contents.mimeType ?? "unknown"}`);
+  throw new Error(`${name ?? uri} has no content`);
 }
 
 export async function readResource(server: McpServer, uri: string): Promise<FileUIPart[]> {
   const result = await (await client(server.url)).readResource({ uri });
-  return result.contents.flatMap(resourceParts);
+  return Promise.all(result.contents.map(resourcePart));
 }
 
-function promptParts(message: PromptMessage): (TextUIPart | FileUIPart)[] {
-  const { content } = message;
-
+async function promptPart({ content }: PromptMessage): Promise<TextUIPart | FileUIPart> {
   switch (content.type) {
     case "text":
-      return [{ type: "text", text: content.text }];
+      return { type: "text", text: content.text };
     case "image":
-      return [
-        {
-          type: "file",
-          mediaType: content.mimeType,
-          url: `data:${content.mimeType};base64,${content.data}`,
-        },
-      ];
+      return convertedPart(Uint8Array.fromBase64(content.data), "image", content.mimeType);
     case "resource":
-      return resourceParts(content.resource);
+      return resourcePart(content.resource);
     case "resource_link":
-      return [{ type: "text", text: content.uri }];
+      return { type: "text", text: content.uri };
   }
 }
 
@@ -275,5 +266,10 @@ export async function getPrompt(
   args: Record<string, string>,
 ): Promise<PromptMessages> {
   const result = await (await client(server.url)).getPrompt({ name, arguments: args });
-  return result.messages.map((message) => ({ role: message.role, parts: promptParts(message) }));
+  return Promise.all(
+    result.messages.map(async (message) => ({
+      role: message.role,
+      parts: [await promptPart(message)],
+    })),
+  );
 }

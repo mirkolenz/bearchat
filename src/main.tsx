@@ -1,3 +1,6 @@
+// Temporal for browsers without native support, before anything uses it
+import "temporal-polyfill/global";
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 

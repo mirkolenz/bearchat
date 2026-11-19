@@ -10,6 +10,7 @@ import {
 import { type ClipboardEvent, type FormEvent, type KeyboardEvent, useRef, useState } from "react";
 
 import { Attachments } from "@/components/chat-message";
+import { convertFiles } from "@/components/convert-files";
 import { ModelPicker, ModePicker, ReasoningPicker } from "@/components/chat-settings";
 import { Hint } from "@/components/hint";
 import { McpPicker, promptEntries, resourceEntries } from "@/components/mcp-picker";
@@ -20,7 +21,7 @@ import {
   InputGroupText,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
-import { readAttachment } from "@/lib/attachments";
+import { storeFile } from "@/lib/blobs";
 import type { Model } from "@/lib/connection";
 import { lockedSettings, type ResolvedSettings, type Settings } from "@/lib/settings";
 import { useDictation } from "@/lib/speech";
@@ -82,7 +83,7 @@ export function PromptForm({
   };
 
   const addFiles = async (selected: FileList | null) => {
-    const parts = await Promise.all(Array.from(selected ?? []).map(readAttachment));
+    const parts = await Promise.all((await convertFiles(selected ?? [])).map(storeFile));
     setFiles((current) => [...current, ...parts]);
   };
 

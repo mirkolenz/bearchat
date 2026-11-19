@@ -1,6 +1,14 @@
-import { DownloadIcon, EllipsisIcon, FileTextIcon, FolderOpenIcon, UploadIcon } from "lucide-react";
+import {
+  DownloadIcon,
+  EllipsisIcon,
+  FileTextIcon,
+  FolderOpenIcon,
+  ImageIcon,
+  UploadIcon,
+} from "lucide-react";
 import { type DragEvent, useEffect, useRef, useState } from "react";
 
+import { convertFiles } from "@/components/convert-files";
 import { DeleteMenuItem } from "@/components/delete-menu-item";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,12 +41,10 @@ import {
   SidebarMenuItem,
   SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
-import { toast } from "@/components/ui/toast";
-import { readText } from "@/lib/attachments";
+import { dataURL, imageFormat, isImageName } from "@/lib/convert";
 import { deleteFile, listFiles, subscribeFiles, writeFile } from "@/lib/files";
-import { downloadFile, errorMessage } from "@/lib/utils";
+import { downloadFile, formatTime } from "@/lib/utils";
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 const sizeFormat = new Intl.NumberFormat(undefined, {
   notation: "compact",
   style: "unit",
@@ -71,24 +77,12 @@ function useFiles(): File[] | undefined {
 }
 
 async function upload(selected: Iterable<File>) {
-  for (const file of selected) {
-    try {
-      await writeFile(file.name, await readText(file));
-    } catch (error) {
-      toast.add({
-        type: "error",
-        title: `${file.name} was not uploaded`,
-        description: errorMessage(error),
-      });
-    }
+  for (const file of await convertFiles(selected)) {
+    await writeFile(file.name, file);
   }
 }
 
-async function download(file: File) {
-  downloadFile(file.name, await file.text(), "text/plain");
-}
-
-/** Text files in the browser's private storage, which the file tools and Python can read. */
+/** Files in the browser's private storage, converted like attachments, which the file tools and Python can read. */
 export function FilesPanel() {
   const files = useFiles();
   const input = useRef<HTMLInputElement>(null);
@@ -104,7 +98,7 @@ export function FilesPanel() {
       <SidebarHeader>
         <Button variant="outline" onClick={() => input.current?.click()}>
           <UploadIcon />
-          Upload text files
+          Upload files
         </Button>
         <input
           ref={input}
@@ -126,7 +120,7 @@ export function FilesPanel() {
               </EmptyMedia>
               <EmptyTitle>No files</EmptyTitle>
               <EmptyDescription>
-                Drop text files here. Files written by the model also appear here.
+                Drop images, documents or text files here. Files written by the model also appear here.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -142,7 +136,7 @@ export function FilesPanel() {
                 : files.map((file) => (
                     <SidebarMenuItem key={file.name}>
                       <SidebarMenuButton onClick={() => setPreviewing(file)}>
-                        <FileTextIcon />
+                        {isImageName(file.name) ? <ImageIcon /> : <FileTextIcon />}
                         <span className="truncate">{file.name}</span>
                       </SidebarMenuButton>
                       <DropdownMenu>
@@ -152,7 +146,7 @@ export function FilesPanel() {
                           <EllipsisIcon />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right" align="start">
-                          <DropdownMenuItem onClick={() => void download(file)}>
+                          <DropdownMenuItem onClick={() => downloadFile(file.name, file)}>
                             <DownloadIcon />
                             Download
                           </DropdownMenuItem>
@@ -171,11 +165,16 @@ export function FilesPanel() {
 }
 
 function FilePreview({ file, onClose }: { file: File; onClose: () => void }) {
-  const [text, setText] = useState<string>();
+  const image = isImageName(file.name);
+  // the text, or the data URL of an image
+  const [content, setContent] = useState<string>();
 
   useEffect(() => {
-    void file.text().then(setText);
-  }, [file]);
+    const read = image
+      ? file.bytes().then((bytes) => dataURL(imageFormat.mediaType, bytes))
+      : file.text();
+    void read.then(setContent);
+  }, [file, image]);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -183,12 +182,16 @@ function FilePreview({ file, onClose }: { file: File; onClose: () => void }) {
         <DialogHeader>
           <DialogTitle>{file.name}</DialogTitle>
           <DialogDescription>
-            {sizeFormat.format(file.size)} · {dateFormat.format(file.lastModified)}
+            {sizeFormat.format(file.size)} · {formatTime(file.lastModified)}
           </DialogDescription>
         </DialogHeader>
-        <pre className="max-h-[60svh] overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
-          {text}
-        </pre>
+        {image ? (
+          <img src={content} alt={file.name} className="max-h-[60svh] rounded-md object-contain" />
+        ) : (
+          <pre className="max-h-[60svh] overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
+            {content}
+          </pre>
+        )}
       </DialogContent>
     </Dialog>
   );

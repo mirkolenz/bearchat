@@ -7,7 +7,8 @@ import { Login } from "@/components/login";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { config } from "@/lib/config";
 import { type Session, resumeSession, signOut } from "@/lib/connection";
-import { listThreads, type Thread as ThreadData } from "@/lib/db";
+import type { Thread as ThreadData } from "@/lib/db";
+import { listThreads } from "@/lib/threads";
 import { startRouting, usePage } from "@/lib/route";
 
 interface Startup {

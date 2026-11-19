@@ -16,6 +16,7 @@ const builtinSettings = {
   requestBody: {},
   pythonTool: true,
   fileTools: true,
+  chatTools: true,
   mcpServers: {},
 } as const satisfies Partial<z.infer<typeof settingsSchema>>;
 const base = { ...builtinSettings, ...config.defaults };
@@ -33,6 +34,7 @@ const resolvedSchema = z.object({
   requestBody: settingsSchema.shape.requestBody.catch(base.requestBody),
   pythonTool: settingsSchema.shape.pythonTool.catch(base.pythonTool),
   fileTools: settingsSchema.shape.fileTools.catch(base.fileTools),
+  chatTools: settingsSchema.shape.chatTools.catch(base.chatTools),
   mcpServers: settingsSchema.shape.mcpServers.catch(base.mcpServers),
 });
 

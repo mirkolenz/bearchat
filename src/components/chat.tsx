@@ -1,7 +1,7 @@
 import { useChat } from "@ai-sdk/react";
 import { type FileUIPart, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { MessageSquareIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ChatMessageView } from "@/components/chat-message";
 import { PromptForm } from "@/components/prompt-form";
@@ -27,7 +27,7 @@ import { TraceLine, TraceTitle } from "@/components/ui/trace";
 import { type ChatMessage, continueRequest, createTransport } from "@/lib/chat";
 import { config } from "@/lib/config";
 import type { Session } from "@/lib/connection";
-import { type LoadedThread, saveThread, updateThread } from "@/lib/db";
+import { type LoadedThread, saveThread, updateThread } from "@/lib/threads";
 import type { PromptMessages } from "@/lib/mcp";
 import { openThread, type Route } from "@/lib/route";
 import { chatSettingsSchema, metadataSchema } from "@/lib/schemas";
@@ -38,6 +38,7 @@ import {
   updateUserSettings,
   useUserSettings,
 } from "@/lib/settings";
+import { now } from "@/lib/utils";
 
 interface ThreadProps {
   route: Route;
@@ -67,9 +68,13 @@ export function Thread({
   };
   const snapshot = chatSettingsSchema.parse(settings);
 
+  // the first save creates the chat, later ones only update it, so a deleted chat stays deleted
+  const stored = useRef(initial.exists);
+
   const persist = (messages: ChatMessage[]) => {
     if (!temporary) {
-      void saveThread(id, snapshot, messages);
+      void saveThread(id, snapshot, messages, !stored.current);
+      stored.current = true;
     }
   };
 
@@ -86,7 +91,7 @@ export function Thread({
     id,
     messages: initial.messages,
     messageMetadataSchema: metadataSchema,
-    transport: createTransport(connection, settings),
+    transport: createTransport(connection, settings, id),
     // resumes the agent once every pending tool call has been approved or denied
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     // also called after errors and aborts, so partial responses are kept
@@ -109,11 +114,13 @@ export function Thread({
 
   // the one path for user messages, so each one is timestamped like the replies
   const send = (text: string, files: FileUIPart[], messageId?: string) =>
-    void sendMessage({ text, files, messageId, metadata: { createdAt: Date.now() } });
+    void sendMessage({ text, files, messageId, metadata: { createdAt: now() } });
 
   const fork = (index: number) => {
     const forkId = crypto.randomUUID();
-    void saveThread(forkId, snapshot, messages.slice(0, index + 1)).then(() => openThread(forkId));
+    void saveThread(forkId, snapshot, messages.slice(0, index + 1), true).then(() =>
+      openThread(forkId),
+    );
   };
 
   // edits outside of a request, which the chat's onFinish does not see
@@ -131,7 +138,7 @@ export function Thread({
       ...inserted.map((message) => ({
         id: crypto.randomUUID(),
         ...message,
-        metadata: { createdAt: Date.now() },
+        metadata: { createdAt: now() },
       })),
     ]);
 

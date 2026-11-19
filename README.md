@@ -6,14 +6,18 @@ It runs entirely in the browser, so any static file server can host it.
 ## Features
 
 - Streaming responses with reasoning, Markdown, code highlighting, math, and Mermaid diagrams.
-- Image and text file attachments, dictation and read aloud.
+- Attachments of images, documents and text files, dictation and read aloud.
+  Images are downscaled to JPEG, and documents such as PDF, Word, PowerPoint, Excel, OpenDocument, RTF and EPUB are converted to Markdown in the browser with [anydoc](https://github.com/firecrawl/anydoc), while other binary files are rejected.
 - Editing, retrying, continuing, forking and deleting messages.
 - Per-chat model, reasoning effort and tool execution mode, plus custom instructions and request options.
-- Tools that run in the browser: a Python sandbox and private text files, plus MCP servers chosen by the user or operator.
-  The files are managed in the sidebar and available to Python through `pathlib` and `os`.
-- MCP servers over the stateless protocol revision 2026-07-28: tools, server instructions, resources and resource templates attached from the paperclip, prompts inserted with `/`, completions for their arguments, and forms when a server asks for input.
+- Tools that run in the browser: a Python sandbox, private files with line ranges, exact edits and image viewing, and search in the saved chats, plus MCP servers chosen by the user or operator.
+  The files are managed in the sidebar, where uploads are converted like attachments, and text files are available to Python through `pathlib` and `os`.
+  Attachments belong to a single chat, while files persist across chats.
+- User messages start with the time they were sent, which keeps the system prompt free of changing values, so servers can reuse the cached prompt prefix.
+- MCP servers over the stateless protocol revision 2026-07-28: tools, server instructions, resources and resource templates attached from the paperclip and converted like attachments, prompts inserted with `/`, completions for their arguments, and forms when a server asks for input.
 - Token usage, generation speed and context usage per reply.
-- Chats are stored in IndexedDB, with each attachment stored once, and can be searched, exported and imported.
+- Chats are stored in IndexedDB, and can be searched, exported and imported.
+  Messages reference binary content such as attachments and images in tool results, which is stored once per content and only sent to the model as part of a request.
   Exports embed their attachments and follow `backup.schema.json`, and temporary chats are never stored.
 
 ## Development
@@ -58,7 +62,8 @@ Settings are resolved from these layers, later ones take precedence:
 | `instructions` | `""`                 | Custom instructions added to the system prompt.                                              |
 | `requestBody`  | `{}`                 | JSON merged into every request, e.g. `{"top_k": 20}`.                                        |
 | `pythonTool`   | `true`               | Python sandbox, running [Monty](https://github.com/pydantic/monty) in the browser.           |
-| `fileTools`    | `true`               | Text files in the browser's private storage, managed in the sidebar.                         |
+| `fileTools`    | `true`               | Text and image files in the browser's private storage, managed in the sidebar.               |
+| `chatTools`    | `true`               | Searching and reading the other saved chats.                                                 |
 | `mcpServers`   | `{}`                 | MCP servers by name, e.g. `{"docs": {"url": "https://example.org/mcp"}}`, see below.         |
 
 MCP servers must allow cross-origin requests and need no authentication.

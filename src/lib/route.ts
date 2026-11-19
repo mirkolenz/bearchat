@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-import { type LoadedThread, loadThread } from "@/lib/db";
+import { type LoadedThread, loadThread } from "@/lib/threads";
 
 // The active chat lives in the query string, which static file servers ignore.
 export interface Route {
@@ -18,7 +18,7 @@ export interface Page {
 let current: Page | undefined;
 const listeners = new Set<() => void>();
 // new chats have nothing to load, so they are shown at once
-const newThread: LoadedThread = { messages: [], settings: {}, skipped: 0 };
+const newThread: LoadedThread = { messages: [], exists: false, settings: {}, skipped: 0 };
 
 function routeURL(route: Route): string {
   const url = new URL(location.href);
