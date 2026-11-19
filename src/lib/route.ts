@@ -63,6 +63,9 @@ export function openTemporaryThread() {
   navigate({ id: crypto.randomUUID(), temporary: true }, "push", true);
 }
 
+// The navigations that change the chat within the page, unlike reloads, which load the page again.
+const inAppNavigations: ReadonlySet<NavigationType> = new Set(["push", "replace", "traverse"]);
+
 /** Shows the chat of the current URL, starting a new one if there is none, and follows later navigations. */
 export async function startRouting(): Promise<void> {
   let route = parseRoute(location.href);
@@ -81,6 +84,7 @@ export async function startRouting(): Promise<void> {
 
     if (
       !event.canIntercept ||
+      !inAppNavigations.has(event.navigationType) ||
       event.downloadRequest !== null ||
       destination.origin !== location.origin ||
       destination.pathname !== location.pathname
