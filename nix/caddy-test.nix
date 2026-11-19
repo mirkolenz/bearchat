@@ -38,6 +38,8 @@ let
 in
 runCommand "bearchat-caddy-test"
   {
+    # the Darwin sandbox blocks localhost connections without it
+    __darwinAllowLocalNetworking = true;
     nativeBuildInputs = [
       caddy
       curl
@@ -47,7 +49,14 @@ runCommand "bearchat-caddy-test"
   ''
     export HOME=$TMPDIR
     caddy run --adapter caddyfile --config ${caddyfile} &
-    until curl --silent --output /dev/null http://localhost:8080; do sleep 0.1; done
+    caddy=$!
+    tries=0
+    # fails if Caddy exits or is not ready within ten seconds
+    until curl --silent --output /dev/null http://localhost:8080; do
+      kill -0 $caddy
+      (( ++tries < 100 ))
+      sleep 0.1
+    done
     get() { curl --silent --header 'Sec-Fetch-Site: same-origin' "$@"; }
     login() {
       local token=$1
@@ -63,6 +72,6 @@ runCommand "bearchat-caddy-test"
     test "$(models same-origin)" = 'Bearer secret|'
     test "$(models cross-site)" = ""
 
-    kill %1
+    kill $caddy
     touch $out
   ''
