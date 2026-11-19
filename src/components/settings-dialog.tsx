@@ -1,7 +1,8 @@
-import { DownloadIcon, PlusIcon, UploadIcon, XIcon } from "lucide-react";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { PlusIcon, XIcon } from "lucide-react";
+import { type KeyboardEvent, useState } from "react";
 import { z } from "zod";
 
+import { DataSection } from "@/components/data-section";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,8 +32,6 @@ import {
 } from "@/components/ui/item";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/toast";
-import { exportThreads, importThreads } from "@/lib/threads";
 import {
   mcpServerNameSchema,
   mcpServerURLSchema,
@@ -46,7 +45,7 @@ import {
   updateUserSettings,
   useUserSettings,
 } from "@/lib/settings";
-import { cn, downloadFile, errorMessage, jsonSchema } from "@/lib/utils";
+import { cn, jsonSchema } from "@/lib/utils";
 
 const tools = [
   {
@@ -197,60 +196,6 @@ function McpServerList({
   );
 }
 
-function ChatData() {
-  const importInput = useRef<HTMLInputElement>(null);
-
-  const download = async () => {
-    const backup = await exportThreads();
-    downloadFile(
-      `bearchat-${Temporal.Now.plainDateISO().toString()}.json`,
-      JSON.stringify(backup),
-      "application/json",
-    );
-  };
-
-  const upload = async (file: File) => {
-    try {
-      const count = await importThreads(jsonSchema.parse(await file.text()));
-      toast.add({ type: "success", title: `Imported ${count} chats` });
-    } catch (error) {
-      toast.add({ type: "error", title: "Import failed", description: errorMessage(error) });
-    }
-  };
-
-  return (
-    <Field orientation="horizontal">
-      <FieldContent>
-        <FieldLabel>Chats</FieldLabel>
-        <FieldDescription>Exports and imports all chats with their attachments.</FieldDescription>
-      </FieldContent>
-      <Button variant="outline" size="sm" onClick={() => void download()}>
-        <DownloadIcon />
-        Export
-      </Button>
-      <Button variant="outline" size="sm" onClick={() => importInput.current?.click()}>
-        <UploadIcon />
-        Import
-      </Button>
-      <input
-        ref={importInput}
-        type="file"
-        accept="application/json"
-        hidden
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-
-          if (file) {
-            void upload(file);
-          }
-
-          event.target.value = "";
-        }}
-      />
-    </Field>
-  );
-}
-
 /** Remounted on reset, so text fields drop their drafts. */
 function SettingsFields() {
   const settings = useUserSettings();
@@ -317,7 +262,7 @@ function SettingsFields() {
           <FieldError>{body.error}</FieldError>
         </Field>
       )}
-      <ChatData />
+      <DataSection />
     </FieldGroup>
   );
 }
@@ -351,7 +296,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               setGeneration((current) => current + 1);
             }}
           >
-            Reset
+            Reset settings
           </Button>
           <Button onClick={onClose}>Done</Button>
         </DialogFooter>

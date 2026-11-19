@@ -19,6 +19,8 @@ It runs entirely in the browser, so any static file server can host it.
 - Chats are stored in IndexedDB, and can be searched, exported and imported.
   Messages reference binary content such as attachments and images in tool results, which is stored once per content and only sent to the model as part of a request.
   Exports embed their attachments and follow `backup.schema.json`, and temporary chats are never stored.
+- Exporting, importing and resetting the data in the browser need no server, so they are available in the settings, on the sign-in screen, and when the app fails to start.
+  Resetting deletes all chats, files and settings and signs out.
 
 ## Development
 

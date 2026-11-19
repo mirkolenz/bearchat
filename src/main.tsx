@@ -40,12 +40,21 @@ if (root) {
       </StrictMode>,
     );
   } catch (error) {
+    // loaded only here, so a normal start does not download them
+    const [{ DataSection }, { FieldGroup }] = await Promise.all([
+      import("@/components/data-section"),
+      import("@/components/ui/field"),
+    ]);
     createRoot(root).render(
       <main className="flex min-h-svh items-center justify-center p-6">
-        <Alert variant="destructive" className="max-w-md">
-          <AlertTitle>BearChat failed to start</AlertTitle>
-          <AlertDescription className="whitespace-pre-line">{errorMessage(error)}</AlertDescription>
-        </Alert>
+        <FieldGroup className="max-w-md">
+          <Alert variant="destructive">
+            <AlertTitle>BearChat failed to start</AlertTitle>
+            <AlertDescription className="whitespace-pre-line">{errorMessage(error)}</AlertDescription>
+          </Alert>
+          {/* stored data can cause the failure, so it can be saved and reset from here */}
+          <DataSection />
+        </FieldGroup>
       </main>,
     );
   }

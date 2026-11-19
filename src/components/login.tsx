@@ -1,8 +1,15 @@
 import { useActionState, useState } from "react";
 
+import { DataSection } from "@/components/data-section";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { config } from "@/lib/config";
@@ -72,6 +79,9 @@ export function Login({ error: initialError, onSignIn }: LoginProps) {
             {pending && <Spinner data-icon="inline-start" />}
             Sign in
           </Button>
+          {/* data stays in the browser while signed out, where the settings are out of reach */}
+          <FieldSeparator />
+          <DataSection />
         </FieldGroup>
       </form>
     </main>

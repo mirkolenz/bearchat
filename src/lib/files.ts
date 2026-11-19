@@ -129,3 +129,13 @@ export function renameFile(path: string, target: string): Promise<void> {
     changed();
   });
 }
+
+/** Deletes all files, as part of resetting the app. */
+export function clearFiles(): Promise<void> {
+  return changing(async () => {
+    const directory = await root();
+    const names = await Array.fromAsync(directory.keys());
+    await Promise.all(names.map((name) => directory.removeEntry(name, { recursive: true })));
+    changed();
+  });
+}
