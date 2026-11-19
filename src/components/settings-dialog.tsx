@@ -3,10 +3,10 @@ import { type KeyboardEvent, useState } from "react";
 import { z } from "zod";
 
 import { DataSection } from "@/components/data-section";
+import { DialogBody, DialogPanel } from "@/components/dialog-panel";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -20,7 +20,6 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import {
   Item,
@@ -136,7 +135,7 @@ function McpServerList({
                   {server.url}
                 </ItemDescription>
               </ItemContent>
-              <ItemActions>
+              <ItemActions className="gap-3">
                 <Switch
                   aria-label={`Enable ${key}`}
                   checked={server.enabled}
@@ -163,34 +162,37 @@ function McpServerList({
           ))}
         </ItemGroup>
       )}
-      <ButtonGroup className="w-full">
+      {/* stacked on phones, where a row leaves the URL too little room */}
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           id="mcp-servers"
           aria-label="Server name"
-          className="max-w-28"
+          className="sm:max-w-28"
           placeholder="docs"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           value={name}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={handleKeyDown}
         />
         <Input
+          type="url"
           aria-label="Server URL"
           className="font-mono text-xs"
           placeholder="https://example.org/mcp"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           value={url}
           onChange={(event) => setURL(event.target.value)}
           onKeyDown={handleKeyDown}
         />
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="Add server"
-          disabled={!addable}
-          onClick={add}
-        >
-          <PlusIcon />
+        <Button variant="outline" disabled={!addable} onClick={add}>
+          <PlusIcon data-icon="inline-start" />
+          Add
         </Button>
-      </ButtonGroup>
+      </div>
       <FieldError>{error}</FieldError>
     </>
   );
@@ -272,7 +274,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
+      <DialogPanel className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
@@ -280,12 +282,15 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             each chat.
           </DialogDescription>
         </DialogHeader>
-        <SettingsFields key={generation} />
-        <DialogFooter>
+        <DialogBody>
+          <SettingsFields key={generation} />
+        </DialogBody>
+        {/* one row also on phones, where stacked buttons would leave the settings little room */}
+        <DialogFooter className="flex-row flex-wrap items-center">
           <a
             href="licenses.txt"
             target="_blank"
-            className={cn(buttonVariants({ variant: "link" }), "sm:mr-auto")}
+            className={cn(buttonVariants({ variant: "link" }), "mr-auto px-0")}
           >
             Licenses
           </a>
@@ -300,7 +305,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           </Button>
           <Button onClick={onClose}>Done</Button>
         </DialogFooter>
-      </DialogContent>
+      </DialogPanel>
     </Dialog>
   );
 }

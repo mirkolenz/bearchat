@@ -2,9 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- edge to edge, with the safe areas padded by the app, and resized by on-screen keyboards -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <meta name="referrer" content="no-referrer" />
     <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="oklch(1 0 0)" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="oklch(0.145 0 0)" />
     <link rel="icon" type="image/svg+xml" href="/src/favicon.svg" />
     <title>BearChat</title>
     <style>

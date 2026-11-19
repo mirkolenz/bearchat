@@ -168,6 +168,8 @@ export function Thread({
                   key={message.id}
                   messageId={message.id}
                   scrollAnchor={message.role === "user"}
+                  // items clip their paint, this padding keeps focus rings at their edges visible
+                  className="-mx-1 px-1"
                 >
                   <ChatMessageView
                     message={message}

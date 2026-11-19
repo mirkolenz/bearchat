@@ -22,11 +22,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Hint } from "@/components/hint";
 import { InputGroupButton } from "@/components/ui/input-group";
 import type { Model } from "@/lib/connection";
+import { isTouchScreen } from "@/lib/pointer";
 import type { Settings } from "@/lib/settings";
 import { executionModes, reasoningLevels } from "@/lib/schemas";
 
@@ -69,12 +73,14 @@ export function ModelPicker({
       value={value}
       onValueChange={(next) => next && onChange(next)}
     >
-      <ComboboxTrigger render={<InputGroupButton className="min-w-0" />}>
+      {/* shrinks to the room left in the toolbar, where long ids are truncated */}
+      <ComboboxTrigger render={<InputGroupButton className="min-w-0 shrink" />}>
         <span className="truncate">
           <ComboboxValue />
         </span>
       </ComboboxTrigger>
-      <ComboboxContent className="min-w-72">
+      {/* focusing the search on touch screens would cover the list with the keyboard */}
+      <ComboboxContent className="min-w-72" initialFocus={!isTouchScreen()}>
         <ComboboxInput showTrigger={false} placeholder="Search models" />
         <ComboboxEmpty>No models found.</ComboboxEmpty>
         <ComboboxList>
@@ -89,73 +95,97 @@ export function ModelPicker({
   );
 }
 
-interface OptionPickerProps<T extends string> extends PickerProps<T> {
+/** A setting with a few named values, shown as an icon whose menu picks the value. */
+interface Option<T extends string> {
   label: string;
-  icon: LucideIcon;
-  options: readonly T[];
+  values: readonly T[];
   labels: Record<T, string>;
+  icon: LucideIcon;
+  // values with their own icon
+  icons?: Record<T, LucideIcon>;
+}
+
+export const reasoningOption: Option<Settings["reasoning"]> = {
+  label: "Reasoning",
+  values: reasoningLevels,
+  labels: reasoningLabels,
+  icon: BrainIcon,
+};
+
+export const modeOption: Option<Settings["mode"]> = {
+  label: "MCP tools",
+  values: executionModes,
+  labels: modeLabels,
+  icon: ShieldIcon,
+  icons: modeIcons,
+};
+
+interface OptionProps<T extends string> extends PickerProps<T> {
+  option: Option<T>;
+}
+
+function OptionRadioGroup<T extends string>({ option, value, onChange }: OptionProps<T>) {
+  return (
+    <DropdownMenuRadioGroup
+      value={value}
+      onValueChange={(next) => {
+        const selected = option.values.find((candidate) => candidate === next);
+
+        if (selected) {
+          onChange(selected);
+        }
+      }}
+    >
+      {/* a group label has to be inside its group */}
+      <DropdownMenuLabel>{option.label}</DropdownMenuLabel>
+      {option.values.map((candidate) => (
+        <DropdownMenuRadioItem key={candidate} value={candidate}>
+          {option.labels[candidate]}
+        </DropdownMenuRadioItem>
+      ))}
+    </DropdownMenuRadioGroup>
+  );
 }
 
 // The trigger only shows an icon, its value is named in the hint and the menu.
-function OptionPicker<T extends string>({
-  label,
-  icon: Icon,
-  options,
-  labels,
-  value,
-  onChange,
-}: OptionPickerProps<T>) {
+export function OptionPicker<T extends string>({
+  className,
+  ...props
+}: OptionProps<T> & { className?: string }) {
+  const { option, value } = props;
+  const Icon = option.icons?.[value] ?? option.icon;
+
   return (
     <DropdownMenu>
-      <Hint label={`${label}: ${labels[value]}`}>
-        <DropdownMenuTrigger render={<InputGroupButton size="icon-xs" aria-label={label} />}>
+      <Hint label={`${option.label}: ${option.labels[value]}`}>
+        <DropdownMenuTrigger
+          render={<InputGroupButton size="icon-xs" aria-label={option.label} className={className} />}
+        >
           <Icon />
         </DropdownMenuTrigger>
       </Hint>
       <DropdownMenuContent className="w-40">
-        <DropdownMenuRadioGroup
-          value={value}
-          onValueChange={(next) => {
-            const option = options.find((candidate) => candidate === next);
-
-            if (option) {
-              onChange(option);
-            }
-          }}
-        >
-          {/* a group label has to be inside its group */}
-          <DropdownMenuLabel>{label}</DropdownMenuLabel>
-          {options.map((option) => (
-            <DropdownMenuRadioItem key={option} value={option}>
-              {labels[option]}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        <OptionRadioGroup {...props} />
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
-export function ReasoningPicker(props: PickerProps<Settings["reasoning"]>) {
-  return (
-    <OptionPicker
-      label="Reasoning"
-      icon={BrainIcon}
-      options={reasoningLevels}
-      labels={reasoningLabels}
-      {...props}
-    />
-  );
-}
+/** The same choice as a submenu, which names the current value next to the setting. */
+export function OptionSubmenu<T extends string>(props: OptionProps<T>) {
+  const { option, value } = props;
+  const Icon = option.icons?.[value] ?? option.icon;
 
-export function ModePicker(props: PickerProps<Settings["mode"]>) {
   return (
-    <OptionPicker
-      label="MCP tools"
-      icon={modeIcons[props.value]}
-      options={executionModes}
-      labels={modeLabels}
-      {...props}
-    />
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        <Icon />
+        {option.label}
+        <span className="ml-auto text-muted-foreground">{option.labels[value]}</span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="w-40">
+        <OptionRadioGroup {...props} />
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   );
 }

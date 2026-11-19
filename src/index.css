@@ -127,6 +127,10 @@
 }
 
 @layer base {
+  :root {
+    /* updated by src/lib/viewport.ts */
+    --viewport-height: 100dvh;
+  }
   * {
     @apply border-border outline-ring/50;
   }
@@ -135,5 +139,105 @@
   }
   html {
     @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+    overscroll-behavior: none;
+    /* pinch zoom stays, double taps no longer zoom while tapping controls */
+    touch-action: manipulation;
+  }
+}
+
+/*
+ * Padding and offsets of at least the given spacing that also clear the notch, rounded corners and home indicator,
+ * which apply since the viewport covers the whole screen, e.g. pb-safe-4 or pt-safe-0.
+ */
+@utility p-safe-* {
+  padding: max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-top))
+    max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-right))
+    max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-bottom))
+    max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-left));
+}
+@utility px-safe-* {
+  padding-inline: max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-left))
+    max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-right));
+}
+@utility pt-safe-* {
+  padding-top: max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-top));
+}
+@utility pb-safe-* {
+  padding-bottom: max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-bottom));
+}
+@utility pl-safe-* {
+  padding-left: max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-left));
+}
+@utility top-safe-* {
+  top: max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-top));
+}
+@utility right-safe-* {
+  right: max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-right));
+}
+
+/* Wide formulas scroll instead of being clipped. */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/*
+ * Touch sizing, so that every control is at least 44px, the minimum of Apple's and Google's guidelines.
+ * Unlayered rules take precedence over the utilities, so the generated components stay untouched.
+ */
+@media (pointer: coarse) {
+  button:not([role="switch"], [role="checkbox"]),
+  [role="menuitem"],
+  [role="menuitemradio"],
+  [role="option"],
+  [data-slot="input"],
+  [data-slot="input-group"],
+  [data-slot="native-select"] {
+    min-height: 2.75rem;
+  }
+
+  button:not([role="switch"], [role="checkbox"]) {
+    min-width: 2.75rem;
+  }
+
+  button svg:not([class*="size-"]) {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  [data-slot="tabs-list"] {
+    height: auto;
+  }
+
+  /* inputs fill their taller group, so that the whole group takes taps */
+  [data-slot="input-group"] > input {
+    align-self: stretch;
+    height: auto;
+  }
+
+  /* centered on the taller menu buttons, which make room for it */
+  button[data-sidebar="menu-action"] {
+    top: 0.25rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+  }
+  [data-sidebar="menu-item"]:has([data-sidebar="menu-action"]) [data-sidebar="menu-button"] {
+    padding-right: 2.75rem;
+  }
+
+  /* iOS zooms into fields with smaller text when they are focused */
+  input,
+  textarea,
+  select {
+    font-size: max(1em, 16px);
+  }
+}
+
+/* Controls that streamdown only reveals on hover. */
+@media (hover: none) {
+  [data-streamdown="image-wrapper"] button {
+    opacity: 1;
   }
 }

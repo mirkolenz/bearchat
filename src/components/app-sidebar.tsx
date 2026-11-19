@@ -1,6 +1,5 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import {
-  EllipsisIcon,
   FileDownIcon,
   GhostIcon,
   LogOutIcon,
@@ -12,22 +11,18 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { DeleteMenuItem } from "@/components/delete-menu-item";
+import { DialogBody, DialogPanel } from "@/components/dialog-panel";
 import { FilesPanel } from "@/components/files-panel";
 import { SettingsDialog } from "@/components/settings-dialog";
+import { SidebarItemMenu } from "@/components/sidebar-item-menu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -40,7 +35,6 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -106,7 +100,7 @@ export function AppSidebar({ activeId, initialThreads, onSignOut }: AppSidebarPr
       <Tabs
         value={tab}
         onValueChange={(value) => setTab(value === "files" ? "files" : "chats")}
-        className="min-h-0 flex-1 gap-0"
+        className="min-h-0 flex-1 gap-0 pt-safe-0 pl-safe-0"
       >
         <SidebarHeader>
           <TabsList className="w-full">
@@ -122,7 +116,8 @@ export function AppSidebar({ activeId, initialThreads, onSignOut }: AppSidebarPr
                   <SquarePenIcon />
                   New chat
                 </SidebarMenuButton>
-                <SidebarMenuBadge>
+                {/* shortcuts need a keyboard, which touch screens usually lack */}
+                <SidebarMenuBadge className="pointer-coarse:hidden">
                   <KbdGroup>
                     <Kbd>⇧</Kbd>
                     <Kbd>{modifier}</Kbd>
@@ -146,7 +141,7 @@ export function AppSidebar({ activeId, initialThreads, onSignOut }: AppSidebarPr
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
-              <InputGroupAddon align="inline-end">
+              <InputGroupAddon align="inline-end" className="pointer-coarse:hidden">
                 <KbdGroup>
                   <Kbd>{modifier}</Kbd>
                   <Kbd>K</Kbd>
@@ -163,7 +158,7 @@ export function AppSidebar({ activeId, initialThreads, onSignOut }: AppSidebarPr
                     key={thread.id}
                     thread={thread}
                     active={thread.id === activeId}
-                    onOpen={() => navigate(() => openThread(thread.id))}
+                    navigate={navigate}
                   />
                 ))}
               </SidebarMenu>
@@ -174,7 +169,7 @@ export function AppSidebar({ activeId, initialThreads, onSignOut }: AppSidebarPr
           <FilesPanel />
         </TabsContent>
       </Tabs>
-      <SidebarFooter>
+      <SidebarFooter className="pb-safe-2 pl-safe-2">
         <SettingsMenu onSignOut={onSignOut} />
       </SidebarFooter>
     </Sidebar>
@@ -184,17 +179,18 @@ export function AppSidebar({ activeId, initialThreads, onSignOut }: AppSidebarPr
 interface ThreadItemProps {
   thread: Thread;
   active: boolean;
-  onOpen: () => void;
+  // opens a page and closes the overlaid sidebar
+  navigate: (open: () => void) => void;
 }
 
-function ThreadItem({ thread, active, onOpen }: ThreadItemProps) {
+function ThreadItem({ thread, active, navigate }: ThreadItemProps) {
   const [renaming, setRenaming] = useState(false);
 
   const remove = () => {
     void deleteThread(thread.id);
 
     if (active) {
-      openThread();
+      navigate(() => openThread());
     }
   };
 
@@ -205,25 +201,20 @@ function ThreadItem({ thread, active, onOpen }: ThreadItemProps) {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton isActive={active} onClick={onOpen}>
+      <SidebarMenuButton isActive={active} onClick={() => navigate(() => openThread(thread.id))}>
         <span className="truncate">{thread.title}</span>
       </SidebarMenuButton>
-      <DropdownMenu>
-        <DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label="Chat actions" />}>
-          <EllipsisIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" align="start">
-          <DropdownMenuItem onClick={() => setRenaming(true)}>
-            <PencilIcon />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => void exportMarkdown()}>
-            <FileDownIcon />
-            Export as Markdown
-          </DropdownMenuItem>
-          <DeleteMenuItem onDelete={remove} />
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <SidebarItemMenu label="Chat actions">
+        <DropdownMenuItem onClick={() => setRenaming(true)}>
+          <PencilIcon />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void exportMarkdown()}>
+          <FileDownIcon />
+          Export as Markdown
+        </DropdownMenuItem>
+        <DeleteMenuItem onDelete={remove} />
+      </SidebarItemMenu>
       {renaming && <RenameDialog thread={thread} onClose={() => setRenaming(false)} />}
     </SidebarMenuItem>
   );
@@ -244,21 +235,24 @@ function RenameDialog({ thread, onClose }: { thread: Thread; onClose: () => void
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
-        <form onSubmit={submit} className="flex flex-col gap-4">
+      <DialogPanel>
+        <form onSubmit={submit} className="contents">
           <DialogHeader>
             <DialogTitle>Rename chat</DialogTitle>
           </DialogHeader>
-          <Input
-            aria-label="Title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-          />
+          <DialogBody>
+            <Input
+              aria-label="Title"
+              enterKeyHint="done"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+          </DialogBody>
           <DialogFooter>
             <Button type="submit">Save</Button>
           </DialogFooter>
         </form>
-      </DialogContent>
+      </DialogPanel>
     </Dialog>
   );
 }

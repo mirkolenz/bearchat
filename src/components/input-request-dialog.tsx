@@ -1,11 +1,11 @@
 import { type FormEvent, useId } from "react";
 import { z } from "zod";
 
+import { DialogBody, DialogPanel } from "@/components/dialog-panel";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -218,27 +218,29 @@ function RequestForm({ request }: { request: InputRequest }) {
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-6">
+    <form onSubmit={submit} className="contents">
       <DialogHeader>
         <DialogTitle>{request.server} asks for input</DialogTitle>
         <DialogDescription className="whitespace-pre-wrap">{request.message}</DialogDescription>
       </DialogHeader>
-      {form.success ? (
-        <FieldGroup>
-          {Object.entries(form.data.properties).map(([name, property]) => (
-            <PropertyField
-              key={name}
-              name={name}
-              property={property}
-              required={form.data.required.includes(name)}
-            />
-          ))}
-        </FieldGroup>
-      ) : (
-        <p className="text-sm text-destructive">
-          The server requested input in an unsupported format.
-        </p>
-      )}
+      <DialogBody>
+        {form.success ? (
+          <FieldGroup>
+            {Object.entries(form.data.properties).map(([name, property]) => (
+              <PropertyField
+                key={name}
+                name={name}
+                property={property}
+                required={form.data.required.includes(name)}
+              />
+            ))}
+          </FieldGroup>
+        ) : (
+          <p className="text-sm text-destructive">
+            The server requested input in an unsupported format.
+          </p>
+        )}
+      </DialogBody>
       <DialogFooter>
         <Button
           type="button"
@@ -264,9 +266,7 @@ export function InputRequestDialog() {
       open={request !== undefined}
       onOpenChange={(open) => !open && request?.respond({ action: "cancel" })}
     >
-      <DialogContent className="max-h-[90svh] overflow-y-auto">
-        {request && <RequestForm key={request.id} request={request} />}
-      </DialogContent>
+      <DialogPanel>{request && <RequestForm key={request.id} request={request} />}</DialogPanel>
     </Dialog>
   );
 }

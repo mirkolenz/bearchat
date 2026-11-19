@@ -1,6 +1,5 @@
 import {
   DownloadIcon,
-  EllipsisIcon,
   FileTextIcon,
   FolderOpenIcon,
   ImageIcon,
@@ -10,20 +9,16 @@ import { type DragEvent, useEffect, useRef, useState } from "react";
 
 import { convertFiles } from "@/components/convert-files";
 import { DeleteMenuItem } from "@/components/delete-menu-item";
+import { DialogBody, DialogPanel } from "@/components/dialog-panel";
+import { SidebarItemMenu } from "@/components/sidebar-item-menu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   Empty,
   EmptyDescription,
@@ -36,7 +31,6 @@ import {
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
@@ -90,6 +84,8 @@ export function FilesPanel() {
 
   const drop = (event: DragEvent) => {
     event.preventDefault();
+    // the chat attaches files dropped anywhere else
+    event.stopPropagation();
     void upload(event.dataTransfer.files);
   };
 
@@ -120,7 +116,7 @@ export function FilesPanel() {
               </EmptyMedia>
               <EmptyTitle>No files</EmptyTitle>
               <EmptyDescription>
-                Drop images, documents or text files here. Files written by the model also appear here.
+                Upload or drop images, documents or text files. Files written by the model also appear here.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -139,20 +135,13 @@ export function FilesPanel() {
                         {isImageName(file.name) ? <ImageIcon /> : <FileTextIcon />}
                         <span className="truncate">{file.name}</span>
                       </SidebarMenuButton>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={<SidebarMenuAction showOnHover aria-label="File actions" />}
-                        >
-                          <EllipsisIcon />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" align="start">
-                          <DropdownMenuItem onClick={() => downloadFile(file.name, file)}>
-                            <DownloadIcon />
-                            Download
-                          </DropdownMenuItem>
-                          <DeleteMenuItem onDelete={() => void deleteFile(file.name)} />
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <SidebarItemMenu label="File actions">
+                        <DropdownMenuItem onClick={() => downloadFile(file.name, file)}>
+                          <DownloadIcon />
+                          Download
+                        </DropdownMenuItem>
+                        <DeleteMenuItem onDelete={() => void deleteFile(file.name)} />
+                      </SidebarItemMenu>
                     </SidebarMenuItem>
                   ))}
             </SidebarMenu>
@@ -178,21 +167,23 @@ function FilePreview({ file, onClose }: { file: File; onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogPanel className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{file.name}</DialogTitle>
           <DialogDescription>
             {sizeFormat.format(file.size)} · {formatTime(file.lastModified)}
           </DialogDescription>
         </DialogHeader>
-        {image ? (
-          <img src={content} alt={file.name} className="max-h-[60svh] rounded-md object-contain" />
-        ) : (
-          <pre className="max-h-[60svh] overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
-            {content}
-          </pre>
-        )}
-      </DialogContent>
+        <DialogBody>
+          {image ? (
+            <img src={content} alt={file.name} className="min-h-0 rounded-md object-contain" />
+          ) : (
+            <pre className="rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
+              {content}
+            </pre>
+          )}
+        </DialogBody>
+      </DialogPanel>
     </Dialog>
   );
 }

@@ -61,31 +61,33 @@ export function DataSection() {
 
   return (
     <>
-      <Field orientation="horizontal">
+      <Field orientation="responsive">
         <FieldContent>
           <FieldLabel>Chats</FieldLabel>
           <FieldDescription>Exports and imports all chats with their attachments.</FieldDescription>
         </FieldContent>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={pending}
-          onClick={() => perform(actions.export)}
-        >
-          <DownloadIcon />
-          Export
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={pending}
-          onClick={() => importInput.current?.click()}
-        >
-          <UploadIcon />
-          Import
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending}
+            onClick={() => perform(actions.export)}
+          >
+            <DownloadIcon />
+            Export
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending}
+            onClick={() => importInput.current?.click()}
+          >
+            <UploadIcon />
+            Import
+          </Button>
+        </div>
         <input
           ref={importInput}
           type="file"
@@ -102,7 +104,7 @@ export function DataSection() {
           }}
         />
       </Field>
-      <Field orientation="horizontal">
+      <Field orientation="responsive">
         <FieldContent>
           <FieldLabel>Reset</FieldLabel>
           <FieldDescription>
@@ -117,7 +119,7 @@ export function DataSection() {
           onClick={reset.click}
         >
           <RotateCcwIcon />
-          {reset.confirming ? "Click again to reset" : "Reset app"}
+          {reset.confirming ? "Confirm reset" : "Reset app"}
         </Button>
       </Field>
       {status.message && <FieldDescription>{status.message}</FieldDescription>}

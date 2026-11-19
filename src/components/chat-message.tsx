@@ -94,10 +94,11 @@ export function ChatMessageView({
     return (
       <EditForm
         text={text}
+        files={files}
         onCancel={() => setEditing(false)}
-        onSave={(next) => {
+        onSave={(nextText, nextFiles) => {
           setEditing(false);
-          onEdit(next, files);
+          onEdit(nextText, nextFiles);
         }}
       />
     );
@@ -131,8 +132,17 @@ export function ChatMessageView({
               return null;
           }
         })}
-        {!streaming && (
-          <MessageFooter className="gap-1 opacity-0 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
+        {/* hidden instead of removed while streaming, so the reply does not jump once it ends */}
+        <MessageFooter
+          inert={streaming}
+          className={cn(
+            "flex-wrap gap-1",
+            // revealed on hover with a mouse, always shown on touch screens
+            "pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:group-hover/message:opacity-100 pointer-fine:focus-within:opacity-100",
+            !isUser && "px-0",
+            streaming && "invisible",
+          )}
+        >
             <CopyButton text={text} />
             <Action
               label="Read aloud"
@@ -163,8 +173,7 @@ export function ChatMessageView({
               <Trash2Icon />
             </Action>
             {message.metadata?.model && <MessageDetails message={message} />}
-          </MessageFooter>
-        )}
+        </MessageFooter>
       </MessageContent>
     </Message>
   );
@@ -198,7 +207,8 @@ function MessageDetails({ message }: { message: ChatMessage }) {
     details.push(`${secondsBetween(createdAt, firstTokenAt).toFixed(1)} s to first token`);
   }
 
-  return <span className="ml-1 truncate">{details.join(" · ")}</span>;
+  // on its own line on phones, where the actions take the full width
+  return <span className="ml-1 truncate max-sm:ml-0 max-sm:basis-full">{details.join(" · ")}</span>;
 }
 
 interface AttachmentsProps {
@@ -271,7 +281,7 @@ function ToolValue({ label, value, className }: ToolValueProps) {
           <pre
             key={index}
             className={cn(
-              "max-h-64 overflow-auto rounded-md bg-muted p-2 font-mono text-xs whitespace-pre-wrap",
+              "max-h-64 overflow-auto overscroll-contain rounded-md bg-muted p-2 font-mono text-xs whitespace-pre-wrap",
               className,
             )}
           >
@@ -282,7 +292,7 @@ function ToolValue({ label, value, className }: ToolValueProps) {
             key={index}
             url={part.uri}
             alt={part.name}
-            className="max-h-64 self-start rounded-md"
+            className="max-h-64 max-w-full self-start rounded-md"
           />
         ),
       )}
@@ -375,26 +385,39 @@ function CopyButton({ text }: { text: string }) {
 
 interface EditFormProps {
   text: string;
+  files: FileUIPart[];
   onCancel: () => void;
-  onSave: (text: string) => void;
+  onSave: (text: string, files: FileUIPart[]) => void;
 }
 
-function EditForm({ text, onCancel, onSave }: EditFormProps) {
+function EditForm({ text, files: initialFiles, onCancel, onSave }: EditFormProps) {
   const [value, setValue] = useState(text);
+  const [files, setFiles] = useState(initialFiles);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
 
-    if (value.trim()) {
-      onSave(value);
+    if (value.trim() || files.length > 0) {
+      onSave(value, files);
     }
   };
 
   return (
     <form onSubmit={submit}>
       <InputGroup>
+        {files.length > 0 && (
+          <InputGroupAddon align="block-start">
+            <Attachments
+              files={files}
+              onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))}
+            />
+          </InputGroupAddon>
+        )}
         <InputGroupTextarea
           autoFocus
+          aria-label="Message"
+          // leaves room for the buttons while the on-screen keyboard is open
+          className="max-h-[calc(var(--viewport-height)*0.4)]"
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => event.key === "Escape" && onCancel()}

@@ -3,6 +3,7 @@ import type { FileUIPart } from "ai";
 import {
   type FormEvent,
   type ReactNode,
+  type RefObject,
   useEffect,
   useEffectEvent,
   useId,
@@ -10,6 +11,7 @@ import {
   useState,
 } from "react";
 
+import { DialogBody, DialogPanel } from "@/components/dialog-panel";
 import { Hint } from "@/components/hint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,7 +25,6 @@ import {
 } from "@/components/ui/combobox";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -34,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { InputGroupButton } from "@/components/ui/input-group";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
+import { isTouchScreen } from "@/lib/pointer";
 import {
   complete,
   type CompletionRef,
@@ -143,6 +145,7 @@ function ArgumentInput<T>({
       <Input
         id={id}
         list={`${id}-suggestions`}
+        autoComplete="off"
         required={argument.required}
         value={value}
         onFocus={() => suggest(value)}
@@ -196,8 +199,8 @@ function ArgumentDialog<T>({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[80svh] overflow-y-auto">
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-6">
+      <DialogPanel>
+        <form onSubmit={(event) => void submit(event)} className="contents">
           <DialogHeader>
             <DialogTitle>{entry.title}</DialogTitle>
             <DialogDescription>
@@ -205,22 +208,24 @@ function ArgumentDialog<T>({
               {entry.description && ` · ${entry.description}`}
             </DialogDescription>
           </DialogHeader>
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <FieldGroup>
-            {entry.arguments.map((argument) => (
-              <ArgumentInput
-                key={argument.name}
-                entry={entry}
-                argument={argument}
-                values={values}
-                onChange={(value) => setValues({ ...values, [argument.name]: value })}
-              />
-            ))}
-          </FieldGroup>
+          <DialogBody>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <FieldGroup>
+              {entry.arguments.map((argument) => (
+                <ArgumentInput
+                  key={argument.name}
+                  entry={entry}
+                  argument={argument}
+                  values={values}
+                  onChange={(value) => setValues({ ...values, [argument.name]: value })}
+                />
+              ))}
+            </FieldGroup>
+          </DialogBody>
           <DialogFooter>
             <Button type="submit" disabled={opening}>
               {opening && <Spinner data-icon="inline-start" />}
@@ -228,7 +233,7 @@ function ArgumentDialog<T>({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
+      </DialogPanel>
     </Dialog>
   );
 }
@@ -241,10 +246,22 @@ interface McpPickerProps<T> {
   onOpenChange: (open: boolean) => void;
   load: () => Promise<PickerEntry<T>[]>;
   onPick: (value: T) => void;
+  // the list opens at this element, so it can also be opened while the trigger is hidden
+  anchor: RefObject<HTMLElement | null>;
+  className?: string;
 }
 
 /** A searchable list of what the servers offer, which asks for arguments if needed and hands the result back. */
-export function McpPicker<T>({ label, icon, open, onOpenChange, load, onPick }: McpPickerProps<T>) {
+export function McpPicker<T>({
+  label,
+  icon,
+  open,
+  onOpenChange,
+  load,
+  onPick,
+  anchor,
+  className,
+}: McpPickerProps<T>) {
   const [entries, setEntries] = useState<PickerEntry<T>[]>();
   const [selected, setSelected] = useState<PickerEntry<T>>();
 
@@ -293,12 +310,13 @@ export function McpPicker<T>({ label, icon, open, onOpenChange, load, onPick }: 
         <Hint label={label}>
           {/* the primitive trigger, since the styled one adds a chevron to the icon button */}
           <ComboboxPrimitive.Trigger
-            render={<InputGroupButton size="icon-xs" aria-label={label} />}
+            render={<InputGroupButton size="icon-xs" aria-label={label} className={className} />}
           >
             {icon}
           </ComboboxPrimitive.Trigger>
         </Hint>
-        <ComboboxContent className="min-w-80">
+        {/* focusing the search on touch screens would cover the list with the keyboard */}
+        <ComboboxContent anchor={anchor} initialFocus={!isTouchScreen()}>
           <ComboboxInput showTrigger={false} placeholder={`Search ${label}`} />
           <ComboboxEmpty>{entries === undefined ? "Loading…" : "Nothing found."}</ComboboxEmpty>
           <ComboboxList>

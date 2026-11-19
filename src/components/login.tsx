@@ -1,5 +1,6 @@
 import { useActionState, useState } from "react";
 
+import { CenteredPage } from "@/components/centered-page";
 import { DataSection } from "@/components/data-section";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -34,8 +35,8 @@ export function Login({ error: initialError, onSignIn }: LoginProps) {
   }, initialError);
 
   return (
-    <main className="flex min-h-svh items-center justify-center p-6">
-      <form action={submit} className="w-full max-w-sm">
+    <CenteredPage>
+      <form action={submit}>
         <FieldGroup>
           <h1 className="text-2xl font-semibold">{config.title}</h1>
           {config.baseURL === undefined && (
@@ -44,6 +45,10 @@ export function Login({ error: initialError, onSignIn }: LoginProps) {
               <Input
                 id="base-url"
                 type="url"
+                autoComplete="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 placeholder="https://openrouter.ai/api/v1"
                 value={baseURL}
@@ -60,6 +65,10 @@ export function Login({ error: initialError, onSignIn }: LoginProps) {
               id="token"
               type="password"
               autoComplete="current-password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="go"
               required={config.baseURL !== undefined}
               value={token}
               onChange={(event) => setToken(event.target.value)}
@@ -72,7 +81,7 @@ export function Login({ error: initialError, onSignIn }: LoginProps) {
           </Field>
           {error && (
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="wrap-anywhere">{error}</AlertDescription>
             </Alert>
           )}
           <Button type="submit" disabled={pending}>
@@ -84,6 +93,6 @@ export function Login({ error: initialError, onSignIn }: LoginProps) {
           <DataSection />
         </FieldGroup>
       </form>
-    </main>
+    </CenteredPage>
   );
 }

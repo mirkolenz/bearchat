@@ -11,7 +11,7 @@ export function DeleteMenuItem({ onDelete }: { onDelete: () => void }) {
   return (
     <DropdownMenuItem variant="destructive" closeOnClick={confirming} onClick={click}>
       <Trash2Icon />
-      {confirming ? "Click again to delete" : "Delete"}
+      {confirming ? "Confirm deletion" : "Delete"}
     </DropdownMenuItem>
   );
 }
