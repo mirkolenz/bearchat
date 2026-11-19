@@ -1,7 +1,7 @@
 // The browser's origin private file system, one flat directory shared by all chats.
 // It holds text and the images of uploads, which pass the same conversion as attachments.
 // Names carry the type, since the storage has none, so writes keep the image extension for images.
-import { imageFormat, isImageName } from "@/lib/convert";
+import { imageFormat, isImageName, splitExtension } from "@/lib/convert";
 import { decodeText, exclusive } from "@/lib/utils";
 
 declare global {
@@ -143,6 +143,20 @@ async function write(path: string, content: string | Blob): Promise<void> {
 
 export function writeFile(path: string, content: string | Blob): Promise<void> {
   return changing(() => write(path, content));
+}
+
+/** Writes a file without replacing another one, numbering the name if it is taken, such as report-2.md. */
+export function addFile(path: string, content: Blob): Promise<void> {
+  return changing(async () => {
+    const [stem, extension] = splitExtension(fileName(path));
+    let name = `${stem}${extension}`;
+
+    for (let number = 2; await fileExists(name); number++) {
+      name = `${stem}-${number}${extension}`;
+    }
+
+    await write(name, content);
+  });
 }
 
 /** Replaces the text of a file with the result of the update, without changes in between. */

@@ -120,10 +120,18 @@ export function Thread({
   const send = (text: string, files: FileUIPart[], messageId?: string) =>
     void sendMessage({ text, files, messageId, metadata: { createdAt: now() } });
 
-  // edits outside of a request, which the chat's onFinish does not see
-  const replace = (next: ChatMessage[]) => {
-    setMessages(next);
-    persist(next);
+  // Edits outside of a request, which the chat's onFinish does not see, and which a running reply would overwrite.
+  // They apply to the chat's current messages, which the rendered ones may lag behind.
+  const change = (edit: (current: ChatMessage[]) => ChatMessage[]) => {
+    if (busy) {
+      throw new Error("Wait for the reply to finish");
+    }
+
+    setMessages((current) => {
+      const next = edit(current);
+      persist(next);
+      return next;
+    });
   };
 
   // The actions of messages keep their identity while a reply streams, so that only the streaming message re-renders.
@@ -144,18 +152,20 @@ export function Thread({
   });
 
   const remove = useStableCallback((messageId: string) =>
-    replace(messages.filter((message) => message.id !== messageId)),
+    change((current) => current.filter((message) => message.id !== messageId)),
   );
 
-  const insert = (inserted: PromptMessages) =>
-    replace([
-      ...messages,
+  // Prompts load asynchronously, so a reply may have started meanwhile.
+  const insert = useStableCallback((inserted: PromptMessages) =>
+    change((current) => [
+      ...current,
       ...inserted.map((message) => ({
         id: crypto.randomUUID(),
         ...message,
         metadata: { createdAt: now() },
       })),
-    ]);
+    ]),
+  );
 
   return (
     <>

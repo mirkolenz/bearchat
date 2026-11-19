@@ -36,7 +36,7 @@ import {
   SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { dataURL, imageFormat, isImageName } from "@/lib/convert";
-import { deleteFile, watchFiles, writeFile } from "@/lib/files";
+import { addFile, deleteFile, watchFiles } from "@/lib/files";
 import { downloadFile, formatTime } from "@/lib/utils";
 
 const sizeFormat = new Intl.NumberFormat(undefined, {
@@ -57,7 +57,7 @@ function useFiles(): File[] | undefined {
 
 async function upload(selected: Iterable<File>) {
   for (const file of await convertFiles(selected)) {
-    await writeFile(file.name, file);
+    await addFile(file.name, file);
   }
 }
 

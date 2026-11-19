@@ -42,12 +42,16 @@ export function dataURL(mediaType: string, bytes: Uint8Array) {
 /** The format of all images, attached or stored, whose names carry its extension. */
 export const imageFormat = { mediaType: "image/jpeg", extension: "jpg" } as const;
 
-/** Replaces the extension, so that the name matches the converted content. */
-function withExtension(name: string, extension: string): string {
+/** Splits a name into its stem and its extension with the dot, which is empty if there is none. */
+export function splitExtension(name: string): [stem: string, extension: string] {
   const dot = name.lastIndexOf(".");
   // a dot that starts the name or one of the directories of a URI begins no extension
-  const stem = dot > name.lastIndexOf("/") + 1 ? name.slice(0, dot) : name;
-  return `${stem}.${extension}`;
+  return dot > name.lastIndexOf("/") + 1 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+}
+
+/** Replaces the extension, so that the name matches the converted content. */
+function withExtension(name: string, extension: string): string {
+  return `${splitExtension(name)[0]}.${extension}`;
 }
 
 export function isImageName(name: string): boolean {
