@@ -177,10 +177,7 @@ export function PromptForm({
   };
 
   return (
-    <form
-      onSubmit={submit}
-      className="mx-auto w-full max-w-3xl px-4 pb-safe-4"
-    >
+    <form onSubmit={submit} className="mx-auto w-full max-w-3xl px-4 pb-safe-4">
       <InputGroup ref={composer}>
         {files.length > 0 && (
           <InputGroupAddon align="block-start">
@@ -254,7 +251,9 @@ export function PromptForm({
                   <DropdownMenuSeparator />
                   {/* a label has to be inside a group */}
                   <DropdownMenuGroup>
-                    <DropdownMenuLabel className="tabular-nums">Context used: {context}</DropdownMenuLabel>
+                    <DropdownMenuLabel className="tabular-nums">
+                      Context used: {context}
+                    </DropdownMenuLabel>
                   </DropdownMenuGroup>
                 </>
               )}

@@ -54,13 +54,18 @@ function blobDownloader(): Experimental_DownloadFunction {
   });
   return (requests) =>
     Promise.all(
-      requests.map(async ({ url: { href } }) => (blobHash(href) === undefined ? null : download(href))),
+      requests.map(async ({ url: { href } }) =>
+        blobHash(href) === undefined ? null : download(href),
+      ),
     );
 }
 
 async function textFilePart(part: FileUIPart): Promise<TextUIPart> {
   const text = await (await loadBlob(part.url)).text();
-  return { type: "text", text: `<file name=${JSON.stringify(part.filename ?? "file")}>\n${text}\n</file>` };
+  return {
+    type: "text",
+    text: `<file name=${JSON.stringify(part.filename ?? "file")}>\n${text}\n</file>`,
+  };
 }
 
 /**

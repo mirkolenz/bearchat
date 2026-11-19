@@ -1,10 +1,4 @@
-import {
-  DownloadIcon,
-  FileTextIcon,
-  FolderOpenIcon,
-  ImageIcon,
-  UploadIcon,
-} from "lucide-react";
+import { DownloadIcon, FileTextIcon, FolderOpenIcon, ImageIcon, UploadIcon } from "lucide-react";
 import { type DragEvent, useEffect, useRef, useState } from "react";
 
 import { convertFiles } from "@/components/convert-files";
@@ -12,12 +6,7 @@ import { DeleteMenuItem } from "@/components/delete-menu-item";
 import { DialogBody, DialogPanel } from "@/components/dialog-panel";
 import { SidebarItemMenu } from "@/components/sidebar-item-menu";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   Empty,
@@ -101,7 +90,8 @@ export function FilesPanel() {
               </EmptyMedia>
               <EmptyTitle>No files</EmptyTitle>
               <EmptyDescription>
-                Upload or drop images, documents or text files. Files written by the model also appear here.
+                Upload or drop images, documents or text files. Files written by the model also
+                appear here.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

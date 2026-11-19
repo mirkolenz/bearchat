@@ -145,36 +145,36 @@ export const ChatMessageView = memo(function ChatMessageView({
             streaming && "invisible",
           )}
         >
-            <CopyButton text={text} />
-            <Action
-              label="Read aloud"
-              onClick={() => (speechSynthesis.speaking ? speechSynthesis.cancel() : speak(text))}
-            >
-              <Volume2Icon />
+          <CopyButton text={text} />
+          <Action
+            label="Read aloud"
+            onClick={() => (speechSynthesis.speaking ? speechSynthesis.cancel() : speak(text))}
+          >
+            <Volume2Icon />
+          </Action>
+          {isUser ? (
+            <Action label="Edit" disabled={busy} onClick={() => setEditing(true)}>
+              <PencilIcon />
             </Action>
-            {isUser ? (
-              <Action label="Edit" disabled={busy} onClick={() => setEditing(true)}>
-                <PencilIcon />
+          ) : (
+            <>
+              <Action label="Retry" disabled={busy} onClick={() => onRetry(message.id)}>
+                <RefreshCwIcon />
               </Action>
-            ) : (
-              <>
-                <Action label="Retry" disabled={busy} onClick={() => onRetry(message.id)}>
-                  <RefreshCwIcon />
+              {last && (
+                <Action label="Continue" disabled={busy} onClick={onContinue}>
+                  <FastForwardIcon />
                 </Action>
-                {last && (
-                  <Action label="Continue" disabled={busy} onClick={onContinue}>
-                    <FastForwardIcon />
-                  </Action>
-                )}
-              </>
-            )}
-            <Action label="Fork into a new chat" disabled={busy} onClick={() => onFork(message.id)}>
-              <GitForkIcon />
-            </Action>
-            <Action label="Delete" disabled={busy} onClick={() => onDelete(message.id)}>
-              <Trash2Icon />
-            </Action>
-            {message.metadata?.model && <MessageDetails message={message} />}
+              )}
+            </>
+          )}
+          <Action label="Fork into a new chat" disabled={busy} onClick={() => onFork(message.id)}>
+            <GitForkIcon />
+          </Action>
+          <Action label="Delete" disabled={busy} onClick={() => onDelete(message.id)}>
+            <Trash2Icon />
+          </Action>
+          {message.metadata?.model && <MessageDetails message={message} />}
         </MessageFooter>
       </MessageContent>
     </Message>

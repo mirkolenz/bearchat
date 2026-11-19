@@ -39,7 +39,10 @@ interface SearchResult {
 }
 
 /** The chat as a search result if its title or messages contain all terms. */
-function searchTranscript({ thread, messages }: Transcript, terms: string[]): SearchResult | undefined {
+function searchTranscript(
+  { thread, messages }: Transcript,
+  terms: string[],
+): SearchResult | undefined {
   const lowered = messages.map((message) => message.text.toLowerCase());
   const texts = [thread.title.toLowerCase(), ...lowered];
 
@@ -81,7 +84,9 @@ export function createChatTools(currentId: string) {
         // chats are read in batches until enough match, so a search rarely reads all of them
         for (let start = 0; start < threads.length && found.length < limit; start += batchSize) {
           const transcripts = await loadTranscripts(threads.slice(start, start + batchSize));
-          found.push(...transcripts.flatMap((transcript) => searchTranscript(transcript, terms) ?? []));
+          found.push(
+            ...transcripts.flatMap((transcript) => searchTranscript(transcript, terms) ?? []),
+          );
         }
 
         return found.slice(0, limit);
@@ -103,8 +108,8 @@ export function createChatTools(currentId: string) {
         return {
           title: transcript.thread.title,
           total_messages: transcript.messages.length,
-          messages: sliceRange(transcript.messages, range).map(
-            ({ role, text }, index) => messageLine(start + index, role, text),
+          messages: sliceRange(transcript.messages, range).map(({ role, text }, index) =>
+            messageLine(start + index, role, text),
           ),
         };
       },

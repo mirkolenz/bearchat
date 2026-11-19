@@ -15,12 +15,7 @@ import { FilesPanel } from "@/components/files-panel";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { SidebarItemMenu } from "@/components/sidebar-item-menu";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";

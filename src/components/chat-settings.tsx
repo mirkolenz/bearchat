@@ -159,7 +159,9 @@ export function OptionPicker<T extends string>({
     <DropdownMenu>
       <Hint label={`${option.label}: ${option.labels[value]}`}>
         <DropdownMenuTrigger
-          render={<InputGroupButton size="icon-xs" aria-label={option.label} className={className} />}
+          render={
+            <InputGroupButton size="icon-xs" aria-label={option.label} className={className} />
+          }
         >
           <Icon />
         </DropdownMenuTrigger>

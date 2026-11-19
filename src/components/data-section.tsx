@@ -56,8 +56,7 @@ export function DataSection() {
     },
     {},
   );
-  const perform = (action: () => Promise<string | undefined>) =>
-    startTransition(() => run(action));
+  const perform = (action: () => Promise<string | undefined>) => startTransition(() => run(action));
   const reset = useConfirm(() => perform(actions.reset));
 
   return (

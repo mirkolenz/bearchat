@@ -8,6 +8,9 @@ export function rangeSchema(unit: string) {
   });
 }
 
-export function sliceRange<T>(items: T[], { start = 1, end }: z.infer<ReturnType<typeof rangeSchema>>) {
+export function sliceRange<T>(
+  items: T[],
+  { start = 1, end }: z.infer<ReturnType<typeof rangeSchema>>,
+) {
   return items.slice(start - 1, end);
 }

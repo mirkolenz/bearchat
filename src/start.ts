@@ -12,11 +12,7 @@ export interface Startup {
 export async function start(): Promise<Startup> {
   // Without the renderer, Markdown is shown as plain text, which is preferable to failing to start.
   const markdown = loadMarkdown().catch(() => undefined);
-  const [resumed, page] = await Promise.all([
-    resumeSession(),
-    startRouting(),
-    watchThreads(),
-  ]);
+  const [resumed, page] = await Promise.all([resumeSession(), startRouting(), watchThreads()]);
 
   // only a chat with messages waits for the renderer
   if (page.thread.messages.length > 0) {

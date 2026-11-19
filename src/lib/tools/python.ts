@@ -1,14 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import {
-  deleteFile,
-  fileExists,
-  listNames,
-  readFile,
-  renameFile,
-  writeFile,
-} from "@/lib/files";
+import { deleteFile, fileExists, listNames, readFile, renameFile, writeFile } from "@/lib/files";
 import { errorMessage, lazy } from "@/lib/utils";
 
 // Monty is loaded on first use, since its WebAssembly build is large.
