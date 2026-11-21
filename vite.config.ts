@@ -80,6 +80,7 @@ export default defineConfig({
       fileName: "licenses.txt",
       packages: [
         "@bytecodealliance/preview2-shim",
+        "@firecrawl/anydoc-wasm",
         "@fontsource-variable/inter",
         "tailwindcss",
         "tw-animate-css",
