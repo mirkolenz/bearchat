@@ -8,7 +8,7 @@ workflows:
         - 'determinatesystems/nix-installer-action@v23'
     '.github/workflows/release.yml':
         - 'actions/checkout@v7'
-        - 'cihelper/action-semanticrelease-npm@v1.3.5'
+        - 'cihelper/action-semanticrelease-npm@v1'
 dependencies:
     'actions/checkout@v7':
         ref: 'v7'
@@ -20,8 +20,8 @@ dependencies:
         commit: 'sha1-49933ea5288caeca8642d1e84afbd3f7d6820020'
         owner_id: 44036562
         repo_id: 189476904
-    'cihelper/action-semanticrelease-npm@v1.3.5':
-        ref: 'v1.3.5'
+    'cihelper/action-semanticrelease-npm@v1':
+        ref: 'v1'
         commit: 'sha1-5119ab27646fc13f949b459232db96292100e129'
         owner_id: 120823150
         repo_id: 579499719
