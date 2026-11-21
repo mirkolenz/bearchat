@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1](https://github.com/mirkolenz/bearchat/compare/v1.0.0...v1.0.1) (2026-11-21)
+
+### Bug Fixes
+
+* **chat:** follow streaming replies ([69c5818](https://github.com/mirkolenz/bearchat/commit/69c581819982ec7be3e8c63dabebee93c1699c8e))
+
 ## 1.0.0 (2026-11-21)
 
 ### Features
