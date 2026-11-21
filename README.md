@@ -29,7 +29,7 @@ nix develop  # installs the npm dependencies
 npm run dev
 ```
 
-With `BEARCHAT_PROXY=http://localhost:8080 npm run dev`, the dev server proxies `/v1` to that server, so signing in with the server `/v1` needs no cross-origin requests.
+With `BEARCHAT_PROXY=http://localhost:8080 npm run dev`, the dev server proxies `/v1` to that server and serves a matching `config.json`, so the app talks to it on the same origin without cross-origin requests.
 
 ## Configuration
 

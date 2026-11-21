@@ -62,8 +62,22 @@ function jsonSchemas(): Plugin {
   };
 }
 
-// An inference server such as an SSH port forward, served on the same origin at `/v1`
 const proxyTarget = process.env.BEARCHAT_PROXY;
+
+// Serves an inference server such as an SSH port forward on the same origin at `/v1`,
+// with a config.json that points the app there.
+function devProxy(target: string): Plugin {
+  return {
+    name: "dev-proxy",
+    config: () => ({ server: { proxy: { "/v1/": { target, changeOrigin: true } } } }),
+    configureServer(server) {
+      server.middlewares.use("/config.json", (_, res) => {
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ baseURL: "/v1" }));
+      });
+    },
+  };
+}
 
 export default defineConfig({
   // relative asset paths let one build be served under any URL path
@@ -76,6 +90,7 @@ export default defineConfig({
     tailwindcss(),
     csp(),
     jsonSchemas(),
+    proxyTarget ? devProxy(proxyTarget) : null,
     licenses({
       fileName: "licenses.txt",
       packages: [
@@ -91,7 +106,4 @@ export default defineConfig({
   // Monty's worker imports its WebAssembly modules, which needs module workers
   worker: { format: "es" },
   resolve: { tsconfigPaths: true },
-  server: {
-    proxy: proxyTarget ? { "/v1": { target: proxyTarget, changeOrigin: true } } : undefined,
-  },
 });
