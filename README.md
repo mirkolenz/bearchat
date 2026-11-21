@@ -29,6 +29,8 @@ nix develop  # installs the npm dependencies
 npm run dev
 ```
 
+With `BEARCHAT_PROXY=http://localhost:8080 npm run dev`, the dev server proxies `/v1` to that server, so signing in with the server `/v1` needs no cross-origin requests.
+
 ## Configuration
 
 The operator configures a deployment through an optional `config.json` next to `index.html`.

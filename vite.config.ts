@@ -62,6 +62,9 @@ function jsonSchemas(): Plugin {
   };
 }
 
+// An inference server such as an SSH port forward, served on the same origin at `/v1`
+const proxyTarget = process.env.BEARCHAT_PROXY;
+
 export default defineConfig({
   // relative asset paths let one build be served under any URL path
   base: "./",
@@ -87,4 +90,7 @@ export default defineConfig({
   // Monty's worker imports its WebAssembly modules, which needs module workers
   worker: { format: "es" },
   resolve: { tsconfigPaths: true },
+  server: {
+    proxy: proxyTarget ? { "/v1": { target: proxyTarget, changeOrigin: true } } : undefined,
+  },
 });
