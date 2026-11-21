@@ -93,6 +93,7 @@ The `settings` argument is written to `config.json`, so changing it does not reb
 
 The browser talks to the inference server directly, so the server either has to be on the same origin or allow cross-origin requests.
 Without a `config.json`, BearChat runs on any static file server, for example `npm run build && npm run preview`, and users enter the server themselves, such as `https://openrouter.ai/api/v1`, which allows cross-origin requests.
+Every release deploys such a demo to [GitHub Pages](https://mirkolenz.github.io/bearchat/).
 The recommended setup serves BearChat and the inference server from the same origin behind Caddy.
 There, Caddy stores the token in an `HttpOnly` cookie, so scripts never see it and it cannot be stolen through cross-site scripting.
 
