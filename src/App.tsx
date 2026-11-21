@@ -13,7 +13,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/com
 import { toast } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { config } from "@/lib/config";
-import type { Session } from "@/lib/connection";
+import { canSignOut, type Session } from "@/lib/connection";
 import { openThread, usePage } from "@/lib/route";
 import { errorMessage } from "@/lib/utils";
 import type { Startup } from "@/start";
@@ -71,7 +71,7 @@ function Workspace({ session }: { session: Session }) {
       }}
       className="h-(--viewport-height) min-h-0"
     >
-      <AppSidebar />
+      <AppSidebar canSignOut={canSignOut(session.connection)} />
       <SidebarInset className="min-h-0 min-w-0 px-safe-0">
         <Header />
         <Thread key={route.id} route={route} thread={thread} session={session} />

@@ -46,6 +46,7 @@ Each build ships `config.schema.json`, so editors validate the file when it star
 | `defaults` | `{}`         | Settings that users start from and can change, see below.                            |
 | `locked`   | `{}`         | Settings fixed to these values, whose controls are hidden.                           |
 
+If `baseURL` points to a server that needs no token, the app skips the sign-in and hides the sign-out button.
 The build uses relative paths, so it can be served under any path such as `/chat/` without rebuilding.
 
 ### Settings

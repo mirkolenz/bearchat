@@ -78,6 +78,12 @@ function storedConnection(): Connection | undefined {
   return credentials?.baseURL === fixedBaseURL ? credentials : { baseURL: fixedBaseURL };
 }
 
+/** Whether signing out has an effect, since resuming falls back to a fixed server without a token. */
+export function canSignOut(connection: Connection): boolean {
+  // in cookie mode, signing out clears the proxy's cookie
+  return config.auth === "cookie" || fixedBaseURL === undefined || connection.apiKey !== undefined;
+}
+
 async function openSession(connection: Connection): Promise<Session> {
   const response = await fetch(new URL("models", connection.baseURL), {
     headers: connection.apiKey ? { Authorization: `Bearer ${connection.apiKey}` } : {},
