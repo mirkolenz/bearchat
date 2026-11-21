@@ -169,7 +169,7 @@ export function Thread({
 
   return (
     <>
-      <MessageScrollerProvider>
+      <MessageScrollerProvider autoScroll>
         <MessageScroller className="flex-1">
           <MessageScrollerViewport>
             <MessageScrollerContent className="mx-auto w-full max-w-3xl px-4 py-6">
