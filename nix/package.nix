@@ -40,7 +40,7 @@ let
     '';
 
     meta = {
-      description = "Browser-based chat interface for OpenAI-compatible inference servers";
+      description = "Private browser-only chat interface for OpenAI-compatible inference servers";
       homepage = "https://github.com/mirkolenz/bearchat";
       license = lib.licenses.mit;
       maintainers = with lib.maintainers; [ mirkolenz ];
