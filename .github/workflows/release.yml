@@ -3,9 +3,10 @@ on:
   push:
     branches: [main, beta]
 permissions: {}
-# Never cancel a running release halfway through publishing.
+# Never cancel a running release halfway through publishing. The group must
+# differ from the one of check.yml, which runs within this workflow.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}
   cancel-in-progress: false
 jobs:
   check:
