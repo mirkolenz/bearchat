@@ -25,7 +25,7 @@ import {
 import { toast } from "@/components/ui/toast";
 import { TraceLine, TraceTitle } from "@/components/ui/trace";
 import { useStableCallback } from "@/hooks/use-stable-callback";
-import { type ChatMessage, continueRequest, createTransport } from "@/lib/chat";
+import { type ChatMessage, continueRequest, createTransport, settleToolCalls } from "@/lib/chat";
 import { config } from "@/lib/config";
 import type { Session } from "@/lib/connection";
 import { type PromptMessages, type ServerErrorHandler, serverTools } from "@/lib/mcp";
@@ -107,7 +107,17 @@ export function Thread({
     // resumes the agent once every pending tool call has been approved or denied
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     // also called after errors and aborts, so partial responses are kept
-    onFinish: ({ messages }) => persist(messages),
+    onFinish: ({ messages }) => {
+      // only the reply that just ended can hold unfinished tool calls
+      const last = messages.at(-1);
+      const next = last === undefined ? messages : messages.with(-1, settleToolCalls(last));
+
+      if (next.at(-1) !== last) {
+        setMessages(next);
+      }
+
+      persist(next);
+    },
   });
   const busy = status === "submitted" || status === "streaming";
   const contextUsed = messages.findLast((message) => message.role === "assistant")?.metadata

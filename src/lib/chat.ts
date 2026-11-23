@@ -59,6 +59,28 @@ export function denyApprovals(
   );
 }
 
+/**
+ * Ends the tool calls that a stopped or failed reply left unfinished,
+ * which the next request could not continue otherwise.
+ */
+export function settleToolCalls(message: ChatMessage): ChatMessage {
+  return mapToolCalls(message, (part) => {
+    switch (part.state) {
+      // the call is incomplete, so there is nothing to report
+      case "input-streaming":
+        return undefined;
+      case "input-available":
+        return {
+          ...part,
+          state: "output-error",
+          errorText: "The reply stopped before the tool finished",
+        };
+      default:
+        return part;
+    }
+  });
+}
+
 const approvals = {
   allow: "approved",
   ask: "user-approval",
