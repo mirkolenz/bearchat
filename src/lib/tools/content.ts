@@ -33,6 +33,7 @@ type ModelOutput = Awaited<ReturnType<NonNullable<Tool["toModelOutput"]>>>;
 const mcpResultSchema = z.object({
   content: z.array(z.looseObject({ type: z.string() })),
   structuredContent: z.unknown(),
+  isError: z.boolean().optional(),
 });
 type McpPart = z.infer<typeof mcpResultSchema>["content"][number];
 
@@ -42,20 +43,18 @@ export async function imageLink(image: File): Promise<ContentPart> {
   return { type: "resource_link", uri: url, name: filename ?? image.name, mimeType: mediaType };
 }
 
-// The other parts, such as audio or embedded resources, reach the model as JSON, as upstream sends them.
+// Parts other than text, such as audio or embedded resources, reach the model as JSON, as upstream sends them.
+function partText(part: McpPart): string {
+  return textPartSchema.safeParse(part).data?.text ?? JSON.stringify(part);
+}
+
 async function mcpPart(part: McpPart): Promise<ContentPart> {
-  const text = textPartSchema.safeParse(part);
   const image = imagePartSchema.safeParse(part);
-
-  if (text.success) {
-    return text.data;
-  }
-
   return image.success
     ? imageLink(
         new File([Uint8Array.fromBase64(image.data.data)], "image", { type: image.data.mimeType }),
       )
-    : { type: "text", text: JSON.stringify(part) };
+    : { type: "text", text: partText(part) };
 }
 
 /** Sends stored images as file references, which the agent resolves when it sends the request. */
@@ -89,7 +88,13 @@ export function mcpContentTool(tool: Tool): Tool {
           return { content: [{ type: "text", text: JSON.stringify(output) }] };
         }
 
-        const { structuredContent } = result.data;
+        const { structuredContent, isError } = result.data;
+
+        // thrown, so that the call fails and the model receives the error as such
+        if (isError) {
+          throw new Error(result.data.content.map(partText).join("\n"));
+        }
+
         const content = await Promise.all(result.data.content.map(mcpPart));
         const included =
           structuredContent === undefined ||
