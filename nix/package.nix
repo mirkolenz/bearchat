@@ -29,6 +29,7 @@ let
         ../src
         ../tsconfig.json
         ../vite.config.ts
+        ../vite.icons.ts
         ../vite.licenses.ts
       ];
     };

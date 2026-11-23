@@ -1,12 +1,14 @@
+import { once } from "node:events";
 import { readFileSync } from "node:fs";
+import { Worker } from "node:worker_threads";
 
-import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 import { z } from "zod";
 
 import { backupSchema, configSchema } from "./src/lib/schemas.ts";
+import type { IconRequest } from "./vite.icons.ts";
 import { licenses } from "./vite.licenses.ts";
 
 // Remote images stay blocked so that model output cannot exfiltrate data through image URLs.
@@ -66,6 +68,12 @@ function jsonSchemas(): Plugin {
   };
 }
 
+async function renderPNGs(request: IconRequest): Promise<Uint8Array[]> {
+  const worker = new Worker(new URL("vite.icons.ts", import.meta.url), { workerData: request });
+  const [pngs] = await once(worker, "message");
+  return z.array(z.instanceof(Uint8Array)).parse(pngs);
+}
+
 // Makes the app installable, with icons that put the favicon on an opaque background,
 // scaled into the maskable safe zone, a circle with 40% of the size as radius,
 // which the tail tip 18 units from (15.5, 17.5) touches.
@@ -92,24 +100,16 @@ function webApp(): Plugin {
       })),
     ),
   };
-  // the WebAssembly module can only be initialized once per process
-  let initialized: Promise<void> | undefined;
-
   return {
     name: "web-app",
     apply: "build",
     async generateBundle() {
-      initialized ??= initWasm(
-        readFileSync(new URL(import.meta.resolve("@resvg/resvg-wasm/index_bg.wasm"))),
-      );
-      await initialized;
       const emit = (fileName: string, source: string | Uint8Array) =>
         this.emitFile({ type: "asset", fileName, source });
-      const png = (size: number) =>
-        new Resvg(icon, { fitTo: { mode: "width", value: size } }).render().asPng();
+      const pngs = await renderPNGs({ svg: icon, widths: sizes });
 
-      for (const size of sizes) {
-        emit(`icon-${size}.png`, png(size));
+      for (const [index, size] of sizes.entries()) {
+        emit(`icon-${size}.png`, pngs[index]);
       }
 
       emit("manifest.json", JSON.stringify(manifest, null, 2));
