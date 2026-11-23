@@ -7,7 +7,9 @@ import { deleteFile, listFiles, readBlob, readFile, updateFile, writeFile } from
 import { type ContentResult, contentModelOutput } from "@/lib/tools/content";
 import { rangeSchema, sliceRange } from "@/lib/tools/range";
 
-const nameSchema = z.object({ name: z.string().describe("File name without directories") });
+const nameSchema = z.object({
+  name: z.string().describe("File name without directories, such as notes.md"),
+});
 
 export const fileTools = {
   list_files: tool({
@@ -41,7 +43,7 @@ export const fileTools = {
   }),
   write_file: tool({
     description: "Create or overwrite a text file in the browser's private file storage.",
-    inputSchema: nameSchema.extend({ content: z.string() }),
+    inputSchema: nameSchema.extend({ content: z.string().describe("Complete text of the file") }),
     execute: async ({ name, content }) => {
       await writeFile(name, content);
       return "written";
@@ -52,7 +54,15 @@ export const fileTools = {
       "Edit a text file in the browser's private file storage by exact text replacements, " +
       "applied in order. Each old_text must occur exactly once, otherwise no edit is applied.",
     inputSchema: nameSchema.extend({
-      edits: z.array(z.object({ old_text: z.string().min(1), new_text: z.string() })).min(1),
+      edits: z
+        .array(
+          z.object({
+            old_text: z.string().min(1).describe("Exact text to replace, including whitespace"),
+            new_text: z.string().describe("Text to put in its place"),
+          }),
+        )
+        .min(1)
+        .describe("Replacements applied in order, each to the result of the previous one"),
     }),
     execute: async ({ name, edits }) => {
       await updateFile(name, (text) =>

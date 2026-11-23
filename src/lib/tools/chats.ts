@@ -96,7 +96,9 @@ export function createChatTools(currentId: string) {
       description:
         "Read the text of a saved chat's messages by its id, optionally only a range of them. " +
         "Tool calls and attachments are left out.",
-      inputSchema: z.object({ id: z.string() }).extend(rangeSchema("message").shape),
+      inputSchema: z
+        .object({ id: z.string().describe("Chat id from search_chats") })
+        .extend(rangeSchema("message").shape),
       execute: async ({ id, ...range }) => {
         const transcript = await loadTranscript(id);
 
