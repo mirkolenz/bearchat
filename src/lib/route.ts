@@ -1,6 +1,6 @@
 import { threadSchema } from "@/lib/schemas";
 import { createStore } from "@/lib/store";
-import { type LoadedThread, loadThread } from "@/lib/threads";
+import { type LoadedThread, loadThread, watchThreadIds } from "@/lib/threads";
 
 // The active chat lives in the query string, which static file servers ignore.
 export interface Route {
@@ -70,6 +70,24 @@ function navigate(route: Route, history: NavigationHistoryBehavior = "push", isN
   navigation.navigate(routeURL(route), { history, info: isNew });
 }
 
+/**
+ * Starts a new chat in place of the shown one once it is deleted, also by another tab.
+ * New and temporary chats are not listed, so only a chat that disappears from the list counts.
+ */
+function leaveDeletedThreads() {
+  let listed: ReadonlySet<string> | undefined;
+
+  watchThreadIds((ids) => {
+    const id = target.get()?.id;
+
+    if (id !== undefined && listed?.has(id) && !ids.has(id)) {
+      navigate({ id: crypto.randomUUID(), temporary: false }, "replace", true);
+    }
+
+    listed = ids;
+  });
+}
+
 export function openThread(id?: string) {
   navigate({ id: id ?? crypto.randomUUID(), temporary: false }, "push", id === undefined);
 }
@@ -94,6 +112,7 @@ export async function startRouting(): Promise<Page> {
   }
 
   publish(initial);
+  leaveDeletedThreads();
 
   // Navigations within the app only change the query string, so they stay in the page.
   navigation.addEventListener("navigate", (event) => {

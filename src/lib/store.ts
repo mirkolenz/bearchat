@@ -4,6 +4,8 @@ import { useSyncExternalStore } from "react";
 export interface Store<T> {
   get: () => T;
   set: (value: T) => void;
+  // calls the listener after every change, until the returned function is called
+  subscribe: (listener: () => void) => () => void;
   useValue: () => T;
 }
 
@@ -14,7 +16,9 @@ export function createStore<T>(initial: T): Store<T> {
 
   const subscribe = (listener: () => void) => {
     listeners.add(listener);
-    return () => listeners.delete(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   };
 
   return {
@@ -23,6 +27,7 @@ export function createStore<T>(initial: T): Store<T> {
       value = next;
       listeners.forEach((listener) => listener());
     },
+    subscribe,
     useValue: () => useSyncExternalStore(subscribe, get),
   };
 }

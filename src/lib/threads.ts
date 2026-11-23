@@ -165,6 +165,13 @@ export function watchThreads(): Promise<void> {
   });
 }
 
+/** Calls the listener with the ids of all chats now and after every change, until the returned function is called. */
+export function watchThreadIds(listener: (ids: ReadonlySet<string>) => void): () => void {
+  const notify = () => listener(new Set(threadList.get().map((thread) => thread.id)));
+  notify();
+  return threadList.subscribe(notify);
+}
+
 /** The chats, most recently updated first. */
 export function useThreads(): Thread[] {
   return threadList.useValue();

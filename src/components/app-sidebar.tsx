@@ -69,14 +69,6 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
     setOpenMobile(false);
   };
 
-  const remove = (ids: readonly string[]) => {
-    void deleteThreads(ids);
-
-    if (activeId !== undefined && ids.includes(activeId)) {
-      navigate(() => openThread());
-    }
-  };
-
   // ⇧⌘O starts a new chat and ⌘K searches chats, with Ctrl instead of ⌘ elsewhere
   useEffect(() => {
     const handle = (event: KeyboardEvent) => {
@@ -164,7 +156,7 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
                   icon: <DownloadIcon />,
                   run: (selected) => void downloadBackup(selected.map((thread) => thread.id)),
                 }}
-                onDelete={(selected) => remove(selected.map((thread) => thread.id))}
+                onDelete={(selected) => void deleteThreads(selected.map((thread) => thread.id))}
               />
               <SidebarMenu>
                 {matches.map((thread) =>
@@ -212,14 +204,6 @@ interface ThreadItemProps {
 const ThreadItem = memo(function ThreadItem({ id, title, active, navigate }: ThreadItemProps) {
   const [renaming, setRenaming] = useState(false);
 
-  const remove = () => {
-    void deleteThreads([id]);
-
-    if (active) {
-      navigate(() => openThread());
-    }
-  };
-
   const exportMarkdown = async () => {
     const { messages } = await loadThread(id);
     downloadFile(`${title}.md`, toMarkdown(messages), "text/markdown");
@@ -239,7 +223,7 @@ const ThreadItem = memo(function ThreadItem({ id, title, active, navigate }: Thr
           <FileDownIcon />
           Export as Markdown
         </DropdownMenuItem>
-        <DeleteMenuItem onDelete={remove} />
+        <DeleteMenuItem onDelete={() => void deleteThreads([id])} />
       </SidebarItemMenu>
       {renaming && <RenameDialog id={id} title={title} onClose={() => setRenaming(false)} />}
     </SidebarMenuItem>
