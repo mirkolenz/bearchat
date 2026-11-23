@@ -38,13 +38,7 @@ import {
 import { toMarkdown } from "@/lib/chat";
 import { config } from "@/lib/config";
 import { signOut } from "@/lib/connection";
-import {
-  deleteThreads,
-  downloadBackup,
-  loadThread,
-  updateThread,
-  useThreads,
-} from "@/lib/threads";
+import { deleteThreads, downloadBackup, loadThread, updateThread, useThreads } from "@/lib/threads";
 import { openTemporaryThread, openThread, useTarget } from "@/lib/route";
 import { downloadFile } from "@/lib/utils";
 
