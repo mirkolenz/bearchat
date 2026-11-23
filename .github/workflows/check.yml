@@ -17,4 +17,4 @@ jobs:
         with:
           extra-conf: |
             log-lines = 1000
-      - run: nix flake check --show-trace --no-build
+      - run: nix flake check --show-trace
