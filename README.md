@@ -11,7 +11,8 @@ It runs entirely in the browser, so any static file server can host it.
 - Editing, retrying, continuing, forking and deleting messages.
 - Per-chat model, reasoning effort and tool execution mode, plus custom instructions and request options.
 - Tools that run in the browser: a Python sandbox, private files with line ranges, exact edits and image viewing, and search in the saved chats, plus MCP servers chosen by the user or operator.
-  The files are managed in the sidebar, where uploads are converted like attachments, and text files are available to Python through `pathlib` and `os`.
+  The files are managed in the sidebar, where uploads are converted like attachments, and text files are available to Python through `open()`, `pathlib`, `os` and imports.
+  Python keeps its variables across the runs of a chat and can also run a stored script.
   Attachments belong to a single chat, while files persist across chats.
 - User messages start with the time they were sent, which keeps the system prompt free of changing values, so servers can reuse the cached prompt prefix.
 - MCP servers over the stateless protocol revision 2026-07-28: tools, server instructions, resources and resource templates attached from the paperclip and converted like attachments, prompts inserted with `/`, completions for their arguments, and forms when a server asks for input.

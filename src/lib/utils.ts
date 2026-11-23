@@ -4,6 +4,11 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** An error with the given name, such as FileNotFoundError, which Python code receives as that exception. */
+export function namedError(name: string, message: string): Error {
+  return Object.assign(new Error(message), { name });
+}
+
 export const compactNumber = new Intl.NumberFormat(undefined, { notation: "compact" });
 /** The current time in milliseconds since the Unix epoch, the form timestamps are stored in. */
 export function now(): number {

@@ -2,7 +2,7 @@
 // It holds text and the images of uploads, which pass the same conversion as attachments.
 // Names carry the type, since the storage has none, so writes keep the image extension for images.
 import { imageFormat, isImageName, splitExtension } from "@/lib/convert";
-import { decodeText, exclusive } from "@/lib/utils";
+import { decodeText, exclusive, namedError } from "@/lib/utils";
 
 declare global {
   // part of the File System standard and shipped by all major browsers, but not yet in TypeScript's DOM types
@@ -78,7 +78,7 @@ async function fileHandle(path: string): Promise<FileSystemFileHandle> {
     return await (await root()).getFileHandle(name);
   } catch (error) {
     if (error instanceof DOMException && error.name === "NotFoundError") {
-      throw Object.assign(new Error(`No such file: ${name}`), { name: "FileNotFoundError" });
+      throw namedError("FileNotFoundError", `No such file: ${name}`);
     }
 
     throw error;
@@ -131,11 +131,16 @@ function checkImageName(name: string, image: boolean) {
   }
 }
 
-async function write(path: string, content: string | Blob): Promise<void> {
+async function write(path: string, content: string | Blob, append = false): Promise<void> {
   const name = fileName(path);
   checkImageName(name, content instanceof Blob && content.type === imageFormat.mediaType);
   const handle = await (await root()).getFileHandle(name, { create: true });
-  const writable = await handle.createWritable();
+  const writable = await handle.createWritable({ keepExistingData: append });
+
+  if (append) {
+    await writable.seek((await handle.getFile()).size);
+  }
+
   await writable.write(content);
   await writable.close();
   changed();
@@ -143,6 +148,11 @@ async function write(path: string, content: string | Blob): Promise<void> {
 
 export function writeFile(path: string, content: string | Blob): Promise<void> {
   return changing(() => write(path, content));
+}
+
+/** Appends text to the end of a file in place, creating the file if it is missing. */
+export function appendFile(path: string, text: string): Promise<void> {
+  return changing(() => write(path, text, true));
 }
 
 /** Writes a file without replacing another one, numbering the name if it is taken, such as report-2.md. */

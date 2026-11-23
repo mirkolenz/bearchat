@@ -10,6 +10,7 @@ import { backupSchema, chatSettingsSchema, metadataSchema, threadSchema } from "
 import type { ChatSettings } from "@/lib/settings";
 import { createStore } from "@/lib/store";
 import { contentResultSchema } from "@/lib/tools/content";
+import { forgetPythonState } from "@/lib/tools/python";
 import { exclusive, memoize, now } from "@/lib/utils";
 
 const importedSettingsSchema = chatSettingsSchema.omit({ mode: true });
@@ -279,6 +280,7 @@ export function updateThread(id: string, patch: Partial<Pick<Thread, "title" | "
 }
 
 export function deleteThread(id: string) {
+  forgetPythonState(id);
   return db.transaction("rw", db.threads, db.messages, db.blobs, async () => {
     const rows = await messagesOf(id).toArray();
     await messageKeysOf(id).delete();
