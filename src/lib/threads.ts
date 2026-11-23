@@ -11,7 +11,7 @@ import type { ChatSettings } from "@/lib/settings";
 import { createStore } from "@/lib/store";
 import { contentResultSchema } from "@/lib/tools/content";
 import { forgetPythonState } from "@/lib/tools/python";
-import { exclusive, memoize, now } from "@/lib/utils";
+import { downloadFile, exclusive, memoize, now } from "@/lib/utils";
 
 const importedSettingsSchema = chatSettingsSchema.omit({ mode: true });
 
@@ -291,25 +291,31 @@ export function updateThread(id: string, patch: Partial<Pick<Thread, "title" | "
   return db.threads.update(id, patch);
 }
 
-export function deleteThread(id: string) {
-  forgetPythonState(id);
+/** Deletes chats with their messages in one transaction, and the blobs no other chat references. */
+export function deleteThreads(ids: readonly string[]) {
+  for (const id of ids) {
+    forgetPythonState(id);
+  }
+
   return db.transaction("rw", db.threads, db.messages, db.blobs, async () => {
-    const rows = await messagesOf(id).toArray();
-    await messageKeysOf(id).delete();
-    await db.threads.delete(id);
-    await deleteUnusedBlobs(rows.flatMap((row) => row.blobs));
+    const rows = await Promise.all(ids.map((id) => messagesOf(id).toArray()));
+    await Promise.all(ids.map((id) => messageKeysOf(id).delete()));
+    await db.threads.bulkDelete([...ids]);
+    await deleteUnusedBlobs(rows.flat().flatMap((row) => row.blobs));
   });
 }
 
-/** Exports all chats with their attachments embedded, independent of the database layout. */
-export async function exportThreads(): Promise<z.infer<typeof backupSchema>> {
+/** Exports the given chats, or all of them, with their attachments embedded, independent of the database layout. */
+async function exportThreads(ids?: readonly string[]): Promise<z.infer<typeof backupSchema>> {
+  const selected = ids && new Set(ids);
   // content shared by several messages is encoded once
   const encode = memoize(async (url: string) => {
     const data = await loadBlob(url);
     return dataURL(data.type, await data.bytes());
   });
   // one chat at a time, so that only one chat's messages are loaded besides the export itself
-  const threads = await Array.fromAsync(await listThreads(), async (thread) => ({
+  const listed = (await listThreads()).filter((thread) => selected?.has(thread.id) ?? true);
+  const threads = await Array.fromAsync(listed, async (thread) => ({
     ...thread,
     messages: await Promise.all(
       (await loadThread(thread.id)).messages.map((message) => mapContentURLsAsync(message, encode)),
@@ -318,6 +324,15 @@ export async function exportThreads(): Promise<z.infer<typeof backupSchema>> {
 
   // parsed so that the export contains exactly what an import accepts
   return backupSchema.parse({ app: "bearchat", version: 1, threads });
+}
+
+/** Downloads a backup of the given chats, or of all of them, which importThreads restores. */
+export async function downloadBackup(ids?: readonly string[]): Promise<void> {
+  downloadFile(
+    `bearchat-${Temporal.Now.plainDateISO().toString()}.json`,
+    JSON.stringify(await exportThreads(ids)),
+    "application/json",
+  );
 }
 
 /** Imports a backup, replacing chats with the same id. */

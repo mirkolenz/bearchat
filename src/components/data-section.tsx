@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/field";
 import { useConfirm } from "@/hooks/use-confirm";
 import { jsonSchema } from "@/lib/schemas";
-import { downloadFile, errorMessage } from "@/lib/utils";
+import { errorMessage } from "@/lib/utils";
 
 interface Status {
   message?: string;
@@ -21,12 +21,7 @@ interface Status {
 // The data modules are loaded on demand, so the section also works where the app failed to start.
 const actions = {
   export: async () => {
-    const { exportThreads } = await import("@/lib/threads");
-    downloadFile(
-      `bearchat-${Temporal.Now.plainDateISO().toString()}.json`,
-      JSON.stringify(await exportThreads()),
-      "application/json",
-    );
+    await (await import("@/lib/threads")).downloadBackup();
     return undefined;
   },
   import: async (file: File) => {

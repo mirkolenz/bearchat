@@ -1,4 +1,5 @@
 import {
+  DownloadIcon,
   FileDownIcon,
   GhostIcon,
   LogOutIcon,
@@ -12,6 +13,7 @@ import { flushSync } from "react-dom";
 import { DeleteMenuItem } from "@/components/delete-menu-item";
 import { DialogBody, DialogPanel } from "@/components/dialog-panel";
 import { FilesPanel } from "@/components/files-panel";
+import { SelectableGroupLabel, SelectionItem, useSelection } from "@/components/selection";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { SidebarItemMenu } from "@/components/sidebar-item-menu";
 import { Button } from "@/components/ui/button";
@@ -26,7 +28,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
@@ -37,7 +38,13 @@ import {
 import { toMarkdown } from "@/lib/chat";
 import { config } from "@/lib/config";
 import { signOut } from "@/lib/connection";
-import { deleteThread, loadThread, updateThread, useThreads } from "@/lib/threads";
+import {
+  deleteThreads,
+  downloadBackup,
+  loadThread,
+  updateThread,
+  useThreads,
+} from "@/lib/threads";
 import { openTemporaryThread, openThread, useTargetId } from "@/lib/route";
 import { downloadFile } from "@/lib/utils";
 
@@ -55,10 +62,19 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
   const matches = threads.filter((thread) =>
     thread.title.toLowerCase().includes(query.trim().toLowerCase()),
   );
+  const selection = useSelection(matches, (thread) => thread.id);
 
   const navigate = (open: () => void) => {
     open();
     setOpenMobile(false);
+  };
+
+  const remove = (ids: readonly string[]) => {
+    void deleteThreads(ids);
+
+    if (activeId !== undefined && ids.includes(activeId)) {
+      navigate(() => openThread());
+    }
   };
 
   // ⇧⌘O starts a new chat and ⌘K searches chats, with Ctrl instead of ⌘ elsewhere
@@ -140,17 +156,35 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel>{config.title}</SidebarGroupLabel>
+              <SelectableGroupLabel
+                label={config.title}
+                selection={selection}
+                action={{
+                  label: "Export",
+                  icon: <DownloadIcon />,
+                  run: (selected) => void downloadBackup(selected.map((thread) => thread.id)),
+                }}
+                onDelete={(selected) => remove(selected.map((thread) => thread.id))}
+              />
               <SidebarMenu>
-                {matches.map((thread) => (
-                  <ThreadItem
-                    key={thread.id}
-                    id={thread.id}
-                    title={thread.title}
-                    active={thread.id === activeId}
-                    navigate={navigate}
-                  />
-                ))}
+                {matches.map((thread) =>
+                  selection.selecting ? (
+                    <SelectionItem
+                      key={thread.id}
+                      selection={selection}
+                      id={thread.id}
+                      label={thread.title}
+                    />
+                  ) : (
+                    <ThreadItem
+                      key={thread.id}
+                      id={thread.id}
+                      title={thread.title}
+                      active={thread.id === activeId}
+                      navigate={navigate}
+                    />
+                  ),
+                )}
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
@@ -179,7 +213,7 @@ const ThreadItem = memo(function ThreadItem({ id, title, active, navigate }: Thr
   const [renaming, setRenaming] = useState(false);
 
   const remove = () => {
-    void deleteThread(id);
+    void deleteThreads([id]);
 
     if (active) {
       navigate(() => openThread());

@@ -1,9 +1,10 @@
 import { DownloadIcon, FileTextIcon, FolderOpenIcon, ImageIcon, UploadIcon } from "lucide-react";
-import { type DragEvent, useEffect, useRef, useState } from "react";
+import { type DragEvent, memo, useEffect, useRef, useState } from "react";
 
 import { convertFiles } from "@/components/convert-files";
 import { DeleteMenuItem } from "@/components/delete-menu-item";
 import { DialogBody, DialogPanel } from "@/components/dialog-panel";
+import { SelectableGroupLabel, SelectionItem, useSelection } from "@/components/selection";
 import { SidebarItemMenu } from "@/components/sidebar-item-menu";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,7 +26,7 @@ import {
   SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { dataURL, imageFormat, isImageName } from "@/lib/convert";
-import { addFile, deleteFile, watchFiles } from "@/lib/files";
+import { addFile, deleteFiles, watchFiles } from "@/lib/files";
 import { downloadFile, formatTime } from "@/lib/utils";
 
 const sizeFormat = new Intl.NumberFormat(undefined, {
@@ -55,6 +56,7 @@ export function FilesPanel() {
   const files = useFiles();
   const input = useRef<HTMLInputElement>(null);
   const [previewing, setPreviewing] = useState<File>();
+  const selection = useSelection(files ?? [], (file) => file.name);
 
   const drop = (event: DragEvent) => {
     event.preventDefault();
@@ -97,6 +99,20 @@ export function FilesPanel() {
           </Empty>
         ) : (
           <SidebarGroup>
+            <SelectableGroupLabel
+              label="Files"
+              selection={selection}
+              action={{
+                label: "Download",
+                icon: <DownloadIcon />,
+                run: (selected) => {
+                  for (const file of selected) {
+                    downloadFile(file.name, file);
+                  }
+                },
+              }}
+              onDelete={(selected) => void deleteFiles(selected.map((file) => file.name))}
+            />
             <SidebarMenu>
               {files === undefined
                 ? Array.from({ length: 3 }, (_, index) => (
@@ -104,21 +120,18 @@ export function FilesPanel() {
                       <SidebarMenuSkeleton />
                     </SidebarMenuItem>
                   ))
-                : files.map((file) => (
-                    <SidebarMenuItem key={file.name}>
-                      <SidebarMenuButton onClick={() => setPreviewing(file)}>
-                        {isImageName(file.name) ? <ImageIcon /> : <FileTextIcon />}
-                        <span className="truncate">{file.name}</span>
-                      </SidebarMenuButton>
-                      <SidebarItemMenu label="File actions">
-                        <DropdownMenuItem onClick={() => downloadFile(file.name, file)}>
-                          <DownloadIcon />
-                          Download
-                        </DropdownMenuItem>
-                        <DeleteMenuItem onDelete={() => void deleteFile(file.name)} />
-                      </SidebarItemMenu>
-                    </SidebarMenuItem>
-                  ))}
+                : files.map((file) =>
+                    selection.selecting ? (
+                      <SelectionItem
+                        key={file.name}
+                        selection={selection}
+                        id={file.name}
+                        label={file.name}
+                      />
+                    ) : (
+                      <FileItem key={file.name} file={file} preview={setPreviewing} />
+                    ),
+                  )}
             </SidebarMenu>
           </SidebarGroup>
         )}
@@ -127,6 +140,31 @@ export function FilesPanel() {
     </>
   );
 }
+
+// Memoized, so that opening a preview does not re-render every row.
+const FileItem = memo(function FileItem({
+  file,
+  preview,
+}: {
+  file: File;
+  preview: (file: File) => void;
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton onClick={() => preview(file)}>
+        {isImageName(file.name) ? <ImageIcon /> : <FileTextIcon />}
+        <span className="truncate">{file.name}</span>
+      </SidebarMenuButton>
+      <SidebarItemMenu label="File actions">
+        <DropdownMenuItem onClick={() => downloadFile(file.name, file)}>
+          <DownloadIcon />
+          Download
+        </DropdownMenuItem>
+        <DeleteMenuItem onDelete={() => void deleteFiles([file.name])} />
+      </SidebarItemMenu>
+    </SidebarMenuItem>
+  );
+});
 
 // Longer texts are cut off in the preview, which would otherwise render them in full.
 const maxPreviewLength = 100_000;

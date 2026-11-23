@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { storeBlob } from "@/lib/blobs";
 import { imageFormat, isImageName } from "@/lib/convert";
-import { deleteFile, listFiles, readBlob, readFile, updateFile, writeFile } from "@/lib/files";
+import { deleteFiles, listFiles, readBlob, readFile, updateFile, writeFile } from "@/lib/files";
 import { type ContentResult, contentModelOutput } from "@/lib/tools/content";
 import { rangeSchema, sliceRange } from "@/lib/tools/range";
 
@@ -83,11 +83,12 @@ export const fileTools = {
       return "edited";
     },
   }),
-  delete_file: tool({
-    description: "Delete a file from the browser's private file storage.",
-    inputSchema: nameSchema,
-    execute: async ({ name }) => {
-      await deleteFile(name);
+  delete_files: tool({
+    description:
+      "Delete files from the browser's private file storage, none of them if one is missing.",
+    inputSchema: z.object({ names: z.array(nameSchema.shape.name).min(1) }),
+    execute: async ({ names }) => {
+      await deleteFiles(names);
       return "deleted";
     },
   }),

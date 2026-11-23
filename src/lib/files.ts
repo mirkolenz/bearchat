@@ -174,11 +174,17 @@ export function updateFile(path: string, update: (text: string) => string): Prom
   return changing(async () => write(path, update(await readFile(path))));
 }
 
-export function deleteFile(path: string): Promise<void> {
+/** Deletes files, none of them if one is missing. */
+export function deleteFiles(paths: readonly string[]): Promise<void> {
   return changing(async () => {
-    await fileHandle(path);
-    await (await root()).removeEntry(fileName(path));
-    changed();
+    await Promise.all(paths.map((path) => fileHandle(path)));
+    const directory = await root();
+
+    try {
+      await Promise.all(paths.map((path) => directory.removeEntry(fileName(path))));
+    } finally {
+      changed();
+    }
   });
 }
 

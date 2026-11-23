@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import {
   appendFile,
-  deleteFile,
+  deleteFiles,
   fileExists,
   listNames,
   readFile,
@@ -68,7 +68,7 @@ const pythonFileCalls: ReadonlyMap<string, FileCall> = new Map<string, FileCall>
   ["Path.is_file", (path) => fileExists(path)],
   ["Path.is_dir", async (path) => path === "/"],
   ["Path.iterdir", async () => (await listNames()).map((name) => `/${name}`)],
-  ["Path.unlink", (path) => deleteFile(path)],
+  ["Path.unlink", (path) => deleteFiles([path])],
   [
     "Path.rename",
     async (path, [, target]) => {
