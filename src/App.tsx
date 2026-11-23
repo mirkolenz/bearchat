@@ -1,5 +1,5 @@
 import { SquarePenIcon } from "lucide-react";
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AppSidebar } from "@/components/app-sidebar";
@@ -14,7 +14,8 @@ import { toast } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { config } from "@/lib/config";
 import { canSignOut, type Session } from "@/lib/connection";
-import { openThread, usePage } from "@/lib/route";
+import { openThread, type Route, usePage } from "@/lib/route";
+import { useThreads } from "@/lib/threads";
 import { errorMessage } from "@/lib/utils";
 import type { Startup } from "@/start";
 
@@ -77,8 +78,21 @@ function Workspace({ session }: { session: Session }) {
         <Thread key={route.id} route={route} thread={thread} session={session} />
       </SidebarInset>
       <InputRequestDialog />
+      <DocumentTitle route={route} />
     </SidebarProvider>
   );
+}
+
+/** Names the browser tab after the shown chat, separately so that chat list changes do not re-render the chat. */
+function DocumentTitle({ route }: { route: Route }) {
+  // new and temporary chats are not listed
+  const title = useThreads().find((thread) => thread.id === route.id)?.title;
+
+  useEffect(() => {
+    document.title = title === undefined ? config.title : `${title} · ${config.title}`;
+  }, [title]);
+
+  return null;
 }
 
 function Header() {
