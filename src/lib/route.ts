@@ -156,7 +156,7 @@ export function usePage(): Page {
   return current;
 }
 
-/** The id of the chat that is shown or being opened. */
-export function useTargetId(): string | undefined {
-  return target.useValue()?.id;
+/** The chat that is shown or being opened, replaced by every navigation, also to the same chat. */
+export function useTarget(): Route | undefined {
+  return target.useValue();
 }

@@ -45,7 +45,7 @@ import {
   updateThread,
   useThreads,
 } from "@/lib/threads";
-import { openTemporaryThread, openThread, useTargetId } from "@/lib/route";
+import { openTemporaryThread, openThread, useTarget } from "@/lib/route";
 import { downloadFile } from "@/lib/utils";
 
 // shortcuts use ⌘ on Apple devices and Ctrl elsewhere
@@ -54,7 +54,7 @@ const modifier = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
 export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
   // loaded before the first render, so the list never shows placeholders on startup
   const threads = useThreads();
-  const activeId = useTargetId();
+  const target = useTarget();
   const { setOpenMobile } = useSidebar();
   const [query, setQuery] = useState("");
   const search = useRef<HTMLInputElement>(null);
@@ -64,10 +64,8 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
   );
   const selection = useSelection(matches, (thread) => thread.id);
 
-  const navigate = (open: () => void) => {
-    open();
-    setOpenMobile(false);
-  };
+  // the overlaid sidebar gives way to the opened chat, however it was opened
+  useEffect(() => setOpenMobile(false), [target, setOpenMobile]);
 
   // ⇧⌘O starts a new chat and ⌘K searches chats, with Ctrl instead of ⌘ elsewhere
   useEffect(() => {
@@ -109,7 +107,7 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
           <SidebarHeader>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => navigate(() => openThread())}>
+                <SidebarMenuButton onClick={() => openThread()}>
                   <SquarePenIcon />
                   New chat
                 </SidebarMenuButton>
@@ -123,7 +121,7 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
                 </SidebarMenuBadge>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => navigate(openTemporaryThread)}>
+                <SidebarMenuButton onClick={openTemporaryThread}>
                   <GhostIcon />
                   Temporary chat
                 </SidebarMenuButton>
@@ -172,8 +170,7 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
                       key={thread.id}
                       id={thread.id}
                       title={thread.title}
-                      active={thread.id === activeId}
-                      navigate={navigate}
+                      active={thread.id === target?.id}
                     />
                   ),
                 )}
@@ -196,12 +193,10 @@ interface ThreadItemProps {
   id: string;
   title: string;
   active: boolean;
-  // opens a page and closes the overlaid sidebar
-  navigate: (open: () => void) => void;
 }
 
 // Memoized with plain props, so that a changed chat, a search or a navigation only re-renders the affected rows.
-const ThreadItem = memo(function ThreadItem({ id, title, active, navigate }: ThreadItemProps) {
+const ThreadItem = memo(function ThreadItem({ id, title, active }: ThreadItemProps) {
   const [renaming, setRenaming] = useState(false);
 
   const exportMarkdown = async () => {
@@ -211,7 +206,7 @@ const ThreadItem = memo(function ThreadItem({ id, title, active, navigate }: Thr
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton isActive={active} onClick={() => navigate(() => openThread(id))}>
+      <SidebarMenuButton isActive={active} onClick={() => openThread(id)}>
         <span className="truncate">{title}</span>
       </SidebarMenuButton>
       <SidebarItemMenu label="Chat actions">
