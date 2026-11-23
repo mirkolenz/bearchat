@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.3](https://github.com/mirkolenz/bearchat/compare/v1.0.2...v1.0.3) (2026-11-23)
+
+### Bug Fixes
+
+* **app:** name browser tab after shown chat ([882e7cb](https://github.com/mirkolenz/bearchat/commit/882e7cb1e391f0ee2ca89e501644748790073e48))
+* **route:** leave chat once it is deleted, also from other tabs ([e7ff37c](https://github.com/mirkolenz/bearchat/commit/e7ff37c720161706866d9d2b271eafb722d6dd02))
+* **sidebar:** add bulk delete, export and download for chats and files ([354dc20](https://github.com/mirkolenz/bearchat/commit/354dc209dde9f1af6116dfa1df79c15f7e4b7b6b))
+* **sidebar:** close mobile sidebar on every navigation ([151f7b2](https://github.com/mirkolenz/bearchat/commit/151f7b25b1e7f24e1b43a12d5f83fd3a551e412c))
+
 ## [1.0.2](https://github.com/mirkolenz/bearchat/compare/v1.0.1...v1.0.2) (2026-11-23)
 
 ### Bug Fixes
