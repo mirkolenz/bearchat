@@ -69,9 +69,10 @@ async function downscale(file: File): Promise<File> {
   }
 
   const scale = Math.min(1, maxImageSide / Math.max(bitmap.width, bitmap.height));
+  // at least one pixel, which very narrow images would otherwise round down to zero
   const canvas = new OffscreenCanvas(
-    Math.round(bitmap.width * scale),
-    Math.round(bitmap.height * scale),
+    Math.max(1, Math.round(bitmap.width * scale)),
+    Math.max(1, Math.round(bitmap.height * scale)),
   );
   const context = canvas.getContext("2d");
 
