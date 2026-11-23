@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.0.2](https://github.com/mirkolenz/bearchat/compare/v1.0.1...v1.0.2) (2026-11-23)
+
+### Bug Fixes
+
+* **blobs:** keep only unsaved blobs in memory ([03e3eab](https://github.com/mirkolenz/bearchat/commit/03e3eab9c7a64b865aa0a28f78c15052c8eabdc2))
+* **chat:** settle unfinished tool calls of stopped replies ([8041fc9](https://github.com/mirkolenz/bearchat/commit/8041fc9f5aa2bb3e56f9ac61d8604ddc0b77801d))
+* **connection:** reject server URLs with query or fragment ([4398dcc](https://github.com/mirkolenz/bearchat/commit/4398dccf697388120e5c0474608f8f49b0c8a6cd))
+* **connection:** time out model listing so startup cannot stall ([8e0ff11](https://github.com/mirkolenz/bearchat/commit/8e0ff118692b2b984d0a82d10651752d93bfaacc))
+* **convert:** keep downscaled images at least one pixel wide ([5273072](https://github.com/mirkolenz/bearchat/commit/527307291a0240bcdaacc41c92db1494fa0d9c4e))
+* **logo:** redesign as bear-shaped chat bubble ([1b552a3](https://github.com/mirkolenz/bearchat/commit/1b552a3703ee9d018a8fad8877fb210619ba561f))
+* **mcp:** bind tool approvals to requesting server ([4f7a278](https://github.com/mirkolenz/bearchat/commit/4f7a2783ba501a9ebec215f47a456bec58ee5526))
+* **mcp:** dismiss input requests once their tool calls end ([14bf072](https://github.com/mirkolenz/bearchat/commit/14bf0724e95c3336112deb9f37e6048341ef63fc))
+* **mcp:** enforce selection limits in input forms ([f44c092](https://github.com/mirkolenz/bearchat/commit/f44c0920c624907f6041934561c714ab750a18a4))
+* **mcp:** report tool results with error flag as failures ([13b6396](https://github.com/mirkolenz/bearchat/commit/13b639680311efcf0fc7f677445025c8319330cd))
+* **mcp:** skip tool listing for servers without tools ([fca80ef](https://github.com/mirkolenz/bearchat/commit/fca80efd85fac95ab98bbdae5d8ce3006ef5d5f4))
+* **pwa:** make app installable with rendered icons ([4265409](https://github.com/mirkolenz/bearchat/commit/4265409c4611943f2f995a44c73a849f50157064))
+* **python:** keep chat state and run stored scripts ([ee0da2c](https://github.com/mirkolenz/bearchat/commit/ee0da2ce12610044f328f892ce52c3992619bd4c))
+* **sidebar:** hide sign-out for fixed server without token ([d8d32d2](https://github.com/mirkolenz/bearchat/commit/d8d32d202403baa30f38c1908c626182130ac55d))
+* **threads:** continue in fork when another tab saved chat ([b095a8c](https://github.com/mirkolenz/bearchat/commit/b095a8c4e43e2198cc5f0c267f9a2ac13c80c0a5))
+* **tools:** describe all tool parameters ([7cf0388](https://github.com/mirkolenz/bearchat/commit/7cf0388b328f7f723a57c6a55cd68f8ce4b26a71))
+
 ## [1.0.1](https://github.com/mirkolenz/bearchat/compare/v1.0.0...v1.0.1) (2026-11-21)
 
 ### Bug Fixes
