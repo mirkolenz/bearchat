@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+
+import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
@@ -15,6 +18,7 @@ const contentSecurityPolicy = {
   "worker-src": ["'self'"],
   "style-src": ["'self'", "'unsafe-inline'"],
   "img-src": ["'self'", "data:", "blob:"],
+  "manifest-src": ["'self'"],
   "font-src": ["'self'", "data:"],
   // data: lets text attachments be read back from their data URLs
   "connect-src": ["'self'", "data:", "https:", "http://localhost:*", "http://127.0.0.1:*"],
@@ -62,6 +66,61 @@ function jsonSchemas(): Plugin {
   };
 }
 
+// Makes the app installable, with icons that put the favicon on an opaque background,
+// scaled into the maskable safe zone, a circle with 40% of the size as radius,
+// which the tail tip 18 units from (15.5, 17.5) touches.
+function webApp(): Plugin {
+  const background = "#d9f0e8";
+  const favicon = readFileSync(new URL("src/favicon.svg", import.meta.url), "utf8");
+  const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="${background}"/><g transform="translate(16 16) scale(.71) translate(-15.5 -17.5)">${favicon}</g></svg>`;
+  // Safari scales the largest icon down for the home screen and the macOS dock
+  const largest = 1024;
+  const sizes = [192, 512, largest];
+  // .json instead of .webmanifest, which static file servers may not know the type of
+  const manifest = {
+    name: "BearChat",
+    description: "Private browser-only chat interface for OpenAI-compatible inference servers",
+    start_url: "./",
+    display: "standalone",
+    background_color: background,
+    icons: sizes.flatMap((size) =>
+      ["any", "maskable"].map((purpose) => ({
+        src: `icon-${size}.png`,
+        sizes: `${size}x${size}`,
+        type: "image/png",
+        purpose,
+      })),
+    ),
+  };
+  // the WebAssembly module can only be initialized once per process
+  let initialized: Promise<void> | undefined;
+
+  return {
+    name: "web-app",
+    apply: "build",
+    async generateBundle() {
+      initialized ??= initWasm(
+        readFileSync(new URL(import.meta.resolve("@resvg/resvg-wasm/index_bg.wasm"))),
+      );
+      await initialized;
+      const emit = (fileName: string, source: string | Uint8Array) =>
+        this.emitFile({ type: "asset", fileName, source });
+      const png = (size: number) =>
+        new Resvg(icon, { fitTo: { mode: "width", value: size } }).render().asPng();
+
+      for (const size of sizes) {
+        emit(`icon-${size}.png`, png(size));
+      }
+
+      emit("manifest.json", JSON.stringify(manifest, null, 2));
+    },
+    transformIndexHtml: () => [
+      { tag: "link", injectTo: "head", attrs: { rel: "manifest", href: "manifest.json" } },
+      { tag: "link", injectTo: "head", attrs: { rel: "apple-touch-icon", href: `icon-${largest}.png` } },
+    ],
+  };
+}
+
 const proxyTarget = process.env.BEARCHAT_PROXY;
 
 // Serves an inference server such as an SSH port forward on the same origin at `/v1`,
@@ -90,6 +149,7 @@ export default defineConfig({
     tailwindcss(),
     csp(),
     jsonSchemas(),
+    webApp(),
     proxyTarget ? devProxy(proxyTarget) : null,
     licenses({
       fileName: "licenses.txt",

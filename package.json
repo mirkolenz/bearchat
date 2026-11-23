@@ -38,6 +38,7 @@
     "zod": "^4"
   },
   "devDependencies": {
+    "@resvg/resvg-wasm": "^2",
     "@tailwindcss/vite": "^4",
     "@types/dom-speech-recognition": "^0.0.12",
     "@types/node": "^26",
