@@ -51,6 +51,11 @@ function parseBaseURL(value: string): string {
     throw new Error("The server URL must use http or https");
   }
 
+  // the AI SDK appends endpoint paths to the URL as text, which would end up in these
+  if (url.search !== "" || url.hash !== "") {
+    throw new Error("The server URL cannot have a query or fragment");
+  }
+
   // a directory URL, so that endpoints such as `models` resolve below it
   if (!url.pathname.endsWith("/")) {
     url.pathname += "/";
