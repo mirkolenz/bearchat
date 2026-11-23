@@ -1,4 +1,4 @@
-import { type FormEvent, useId } from "react";
+import { type FormEvent, useId, useState } from "react";
 import { z } from "zod";
 
 import { DialogBody, DialogPanel } from "@/components/dialog-panel";
@@ -15,6 +15,7 @@ import {
   Field,
   FieldContent,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -55,6 +56,8 @@ const propertySchema = z.discriminatedUnion("type", [
       enum: z.array(z.string()).optional(),
       anyOf: z.array(choiceSchema).optional(),
     }),
+    minItems: z.int().optional(),
+    maxItems: z.int().optional(),
     default: z.array(z.string()).optional(),
   }),
 ]);
@@ -125,14 +128,32 @@ function readValue(data: FormData, key: string, property: Property): unknown {
   }
 }
 
+/** Why a multiple choice is out of its limits, which checkboxes cannot enforce on their own. */
+function selectionError(data: FormData, key: string, property: Property): string | undefined {
+  if (property.type !== "array") {
+    return undefined;
+  }
+
+  const count = data.getAll(key).length;
+  const { minItems = 0, maxItems = Infinity } = property;
+
+  if (count < minItems) {
+    return `Select at least ${minItems}`;
+  }
+
+  return count > maxItems ? `Select at most ${maxItems}` : undefined;
+}
+
 function PropertyField({
   name,
   property,
   required,
+  error,
 }: {
   name: string;
   property: Property;
   required: boolean;
+  error?: string;
 }) {
   const id = useId();
   const label = property.title ?? name;
@@ -167,6 +188,7 @@ function PropertyField({
               <FieldLabel htmlFor={`${id}-${choice.value}`}>{choice.label}</FieldLabel>
             </Field>
           ))}
+          <FieldError>{error}</FieldError>
         </FieldSet>
       );
     case "string": {
@@ -225,6 +247,7 @@ function PropertyField({
 
 function RequestForm({ request }: { request: InputRequest }) {
   const form = formSchema.safeParse(request.requestedSchema);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -236,8 +259,21 @@ function RequestForm({ request }: { request: InputRequest }) {
     }
 
     const data = new FormData(event.currentTarget);
+    const properties = Object.entries(form.data.properties);
+    const invalid = Object.fromEntries(
+      properties.flatMap(([key, property]) => {
+        const error = selectionError(data, key, property);
+        return error === undefined ? [] : [[key, error]];
+      }),
+    );
+    setErrors(invalid);
+
+    if (Object.keys(invalid).length > 0) {
+      return;
+    }
+
     const content = Object.fromEntries(
-      Object.entries(form.data.properties).flatMap(([key, property]) => {
+      properties.flatMap(([key, property]) => {
         const value = readValue(data, key, property);
         return value === undefined ? [] : [[key, value]];
       }),
@@ -260,6 +296,7 @@ function RequestForm({ request }: { request: InputRequest }) {
                 name={name}
                 property={property}
                 required={form.data.required.includes(name)}
+                error={errors[name]}
               />
             ))}
           </FieldGroup>
