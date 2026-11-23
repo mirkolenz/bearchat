@@ -80,6 +80,12 @@ async function allPages<T extends { nextCursor?: string }>(
 
 async function listTools(url: string): Promise<ToolListing> {
   const mcp = await client(url);
+
+  // servers that only offer prompts or resources reject listing tools
+  if (!mcp.initializeResult.capabilities.tools) {
+    return { tools: {}, readOnly: new Set() };
+  }
+
   const pages = await allPages((cursor) =>
     mcp.listTools({ params: { cursor }, options: requestOptions }),
   );
