@@ -84,9 +84,9 @@ function blobHashes(message: ChatMessage): string[] {
   return contentURLs(message).flatMap((url) => blobHash(url) ?? []);
 }
 
-/** What a writer last saw of a chat. */
+/** What a saver last saw of a chat. */
 interface Base {
-  // the stored revision, undefined for a chat the writer creates
+  // the stored revision, undefined for a chat that is not stored yet
   revision?: number;
   // the messages of that revision, undefined if unknown, which writes all messages
   messages?: readonly ChatMessage[];
@@ -94,28 +94,30 @@ interface Base {
 
 /**
  * Replaces a chat and its messages in one transaction, which also stores the blobs they reference,
- * and resolves to the new revision, or undefined if the chat was not written.
- * The chat is built from the stored one, if any, and only created by a writer that saw no revision.
- * Given the revision the writer saw, only the messages that were replaced since are written,
+ * and resolves to the new revision.
+ * Without a base, the chat is written as given, as by imports and forks.
+ * Given the base a saver last saw, only the messages that were replaced since are written,
  * since the chat replaces a message object whenever it changes.
- * If another writer saved in between, all messages are written instead.
+ * If the stored chat is no longer that base, nothing is written,
+ * since the saver would discard the changes of another tab.
  */
 function writeThread(
   id: string,
   messages: readonly ChatMessage[],
   build: (existing: Thread | undefined) => Thread,
-  base: Base = {},
-): Promise<number | undefined> {
+  base?: Base,
+): Promise<number | "deleted" | "changed"> {
   return db.transaction("rw", db.threads, db.messages, db.blobs, async () => {
     const existing = await db.threads.get(id);
+    // rows of earlier versions have no revision, which counts as zero
+    const stored = existing && (existing.revision ?? 0);
 
-    // a late save of a deleted chat, e.g. of its aborted response, must not restore it
-    if (existing === undefined && base.revision !== undefined) {
-      return undefined;
+    if (base !== undefined && stored !== base.revision) {
+      // a late save of a deleted chat, e.g. of its aborted response, must not restore it
+      return stored === undefined ? "deleted" : "changed";
     }
 
-    const previous = existing?.revision ?? 0;
-    const saved = base.revision === previous ? base.messages : undefined;
+    const saved = base?.messages;
     const rows: MessageRow[] = messages.flatMap((message, position) =>
       saved?.[position] === message
         ? []
@@ -133,11 +135,12 @@ function writeThread(
       await db.messages.bulkDelete(stale.map((message) => [id, message.id]));
     }
 
-    await db.threads.put({ ...build(existing), revision: previous + 1 });
+    const revision = (stored ?? 0) + 1;
+    await db.threads.put({ ...build(existing), revision });
     await persistBlobs(rows.flatMap((row) => row.blobs));
     await db.messages.bulkPut(rows);
     await deleteUnusedBlobs(dropped);
-    return previous + 1;
+    return revision;
   });
 }
 
@@ -255,9 +258,12 @@ export function saveThread(id: string, settings: ChatSettings, messages: readonl
 /**
  * Saves the loaded chat whenever it changed, writing only the messages that changed since the last save.
  * The first save creates the chat, later ones only update it, so that a chat deleted meanwhile stays deleted.
+ * If another tab saved the chat meanwhile, this tab continues in a fork, which is passed to onFork,
+ * so that neither tab discards the replies of the other.
  * Saves of a chat run one at a time, also across tabs, so a slow save never overwrites a later one.
  */
-export function threadSaver(id: string, loaded: LoadedThread) {
+export function threadSaver(id: string, loaded: LoadedThread, onFork: (id: string) => void) {
+  let target = id;
   // Only advances once a save is committed, so a failed save is repeated by the next one.
   // The messages are unknown if some were skipped, since their positions are still taken.
   let base: Base = {
@@ -267,10 +273,16 @@ export function threadSaver(id: string, loaded: LoadedThread) {
 
   return (settings: ChatSettings, messages: readonly ChatMessage[]) =>
     exclusive(`thread:${id}`, async () => {
-      const revision = await writeChat(id, settings, messages, base);
+      let result = await writeChat(target, settings, messages, base);
 
-      if (revision !== undefined) {
-        base = { revision, messages };
+      if (result === "changed") {
+        target = crypto.randomUUID();
+        result = await saveThread(target, settings, messages);
+        onFork(target);
+      }
+
+      if (typeof result === "number") {
+        base = { revision: result, messages };
       }
     });
 }

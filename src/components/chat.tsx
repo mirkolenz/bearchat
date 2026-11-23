@@ -73,7 +73,15 @@ export function Thread({
     void serverTools(settings, () => undefined);
   }, [settings]);
 
-  const [save] = useState(() => threadSaver(id, initial));
+  const [save] = useState(() =>
+    threadSaver(id, initial, (forkId) => {
+      toast.add({
+        title: "This chat was changed in another tab",
+        description: "This tab continues in a copy, so that the replies of both are kept.",
+      });
+      openThread(forkId);
+    }),
+  );
 
   const persist = (messages: ChatMessage[]) => {
     if (!temporary) {
