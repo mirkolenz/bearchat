@@ -1,15 +1,20 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import {
   type ChatTransport,
+  type DynamicToolUIPart,
   type Experimental_DownloadFunction,
   type FileUIPart,
   DirectChatTransport,
+  getToolName,
   isFileUIPart,
   isTextUIPart,
+  isToolUIPart,
   stepCountIs,
   ToolLoopAgent,
+  type ToolUIPart,
   type UIMessage,
   type TextUIPart,
+  type Tool,
   type UITools,
 } from "ai";
 import { z } from "zod";
@@ -17,12 +22,42 @@ import { z } from "zod";
 import { blobHash, loadBlob } from "@/lib/blobs";
 import { metadataSchema } from "@/lib/schemas";
 import type { Connection } from "@/lib/connection";
-import type { ServerErrorHandler } from "@/lib/mcp";
+import { type ServerErrorHandler, toolServer } from "@/lib/mcp";
 import type { ResolvedSettings } from "@/lib/settings";
 import { createTools } from "@/lib/tools";
 import { memoize, now } from "@/lib/utils";
 
 export type ChatMessage = UIMessage<z.infer<typeof metadataSchema>, never, UITools>;
+type ToolPart = ToolUIPart<UITools> | DynamicToolUIPart;
+
+/** Maps the tool calls of a message, which stays the same object if none changed, so saves skip it. */
+function mapToolCalls(
+  message: ChatMessage,
+  map: (part: ToolPart) => ToolPart | undefined,
+): ChatMessage {
+  const parts = message.parts.flatMap((part) => (isToolUIPart(part) ? (map(part) ?? []) : part));
+  return parts.length === message.parts.length &&
+    parts.every((part, index) => part === message.parts[index])
+    ? message
+    : { ...message, parts };
+}
+
+/** Denies the approved tool calls that have not run yet and that select picks. */
+export function denyApprovals(
+  message: ChatMessage,
+  reason: string,
+  select: (part: ToolPart) => boolean,
+): ChatMessage {
+  return mapToolCalls(message, (part) =>
+    part.state === "approval-responded" && select(part)
+      ? {
+          ...part,
+          state: "output-denied",
+          approval: { ...part.approval, approved: false, reason },
+        }
+      : part,
+  );
+}
 
 const approvals = {
   allow: "approved",
@@ -146,7 +181,7 @@ export function createTransport(
     sendMessages: async (options) => {
       let waiting = true;
       // the attachments are read while the MCP servers are reached
-      const [agent, messages] = await Promise.all([
+      const [agent, prepared] = await Promise.all([
         createAgent(
           connection,
           settings,
@@ -156,6 +191,14 @@ export function createTransport(
         ),
         Promise.all(options.messages.map(modelMessage)),
       ]);
+      // the user approved the calls for the server that requested them,
+      // which may no longer be the server of the tool with that name
+      const messages = prepared.map((message) =>
+        denyApprovals(message, "The MCP server changed since the call was requested", (part) => {
+          const tool: Tool | undefined = agent.tools[getToolName(part)];
+          return toolServer(part.toolMetadata) !== toolServer(tool?.metadata);
+        }),
+      );
       const transport = new DirectChatTransport({
         agent,
         messageMetadata: ({ part }) => {

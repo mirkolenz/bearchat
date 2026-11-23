@@ -129,4 +129,5 @@ For other web servers, [`nix/module.nix`](nix/module.nix) shows the required rou
 - `config.json` is for convenience, not access control, so access to models has to be enforced by the inference server.
 - Imported chats never carry a tool execution mode, and their approved but unexecuted tool calls are denied, so a shared backup cannot approve tools on its own.
 - MCP tools are prefixed with their server name, such as `docs__search`, so no tool can replace another or inherit its approval.
+  Approvals are bound to the URL of the server that requested them and are denied if the server name refers to another URL meanwhile.
 - Dictation only runs on-device, so audio never leaves the browser.

@@ -3,7 +3,7 @@ import { Dexie, liveQuery } from "dexie";
 import type { z } from "zod";
 
 import { blobHash, loadBlob, persistBlobs, storeBlob } from "@/lib/blobs";
-import { type ChatMessage, deriveTitle, messageText } from "@/lib/chat";
+import { type ChatMessage, denyApprovals, deriveTitle, messageText } from "@/lib/chat";
 import { dataURL } from "@/lib/convert";
 import { db, type MessageRow, type Thread } from "@/lib/db";
 import { backupSchema, chatSettingsSchema, metadataSchema, threadSchema } from "@/lib/schemas";
@@ -320,24 +320,6 @@ export async function exportThreads(): Promise<z.infer<typeof backupSchema>> {
   return backupSchema.parse({ app: "bearchat", version: 1, threads });
 }
 
-/** Denies the approved tool calls that have not run yet, which the next request would otherwise run. */
-function denyApprovals(message: ChatMessage): ChatMessage {
-  const parts = message.parts.map((part) =>
-    isToolUIPart(part) && part.state === "approval-responded"
-      ? {
-          ...part,
-          state: "output-denied" as const,
-          approval: {
-            ...part.approval,
-            approved: false as const,
-            reason: "Approvals of imported chats do not carry over",
-          },
-        }
-      : part,
-  );
-  return { ...message, parts };
-}
-
 /** Imports a backup, replacing chats with the same id. */
 export async function importThreads(data: unknown): Promise<number> {
   const backup = backupSchema.parse(data);
@@ -363,7 +345,10 @@ export async function importThreads(data: unknown): Promise<number> {
       // a shared backup must not grant tool permissions, so chats use the user's execution mode
       return {
         thread: { ...thread, settings: importedSettingsSchema.parse(settings) },
-        messages: stored.map(denyApprovals),
+        messages: stored.map((message) =>
+          // the next request would otherwise run them
+          denyApprovals(message, "Approvals of imported chats do not carry over", () => true),
+        ),
       };
     }),
   );

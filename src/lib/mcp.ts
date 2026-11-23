@@ -4,7 +4,7 @@ import {
   ElicitationRequestSchema,
   type MCPClient,
 } from "@ai-sdk/mcp";
-import type { FileUIPart, TextUIPart, ToolSet } from "ai";
+import type { FileUIPart, TextUIPart, Tool, ToolSet } from "ai";
 import { z } from "zod";
 
 import { storeFile } from "@/lib/blobs";
@@ -30,6 +30,14 @@ const toolListings = new Map<string, Promise<ToolListing>>();
 const ttlSchema = z.int().nonnegative();
 // bounds connecting and listing, so that a server that never answers cannot stall every request
 const requestOptions = { timeout: 10_000 };
+
+// the key of the server's URL in the metadata of its tools, which their calls record
+const urlKey = "bearchat/serverURL";
+
+/** The URL of the server of an MCP tool or call, by its metadata, undefined for built-in tools. */
+export function toolServer(metadata: Tool["metadata"]) {
+  return metadata?.[urlKey];
+}
 
 async function connect(url: string): Promise<MCPClient> {
   const client = await createMCPClient({
@@ -81,7 +89,8 @@ async function listTools(url: string): Promise<ToolListing> {
     tools: Object.fromEntries(
       Object.entries(mcp.toolsFromDefinitions(definitions)).map(([name, tool]) => [
         name,
-        mcpContentTool(tool),
+        // the calls record the server's URL, which binds their approval to the server
+        mcpContentTool({ ...tool, metadata: { ...tool.metadata, [urlKey]: url } }),
       ]),
     ),
     readOnly: new Set(
