@@ -13,23 +13,27 @@ export interface InputRequest {
 
 const queue = createStore<readonly InputRequest[]>([]);
 
-/** Asks the user for the input a server requested, resolving once they answered. */
+/** Asks the user for the input a server requested, resolving once they answered or the signal aborts. */
 export function requestInput(
   server: string,
   { message, requestedSchema }: ElicitationRequest["params"],
+  signal?: AbortSignal,
 ): Promise<ElicitResult> {
   return new Promise((resolve) => {
+    const cancel = () => request.respond({ action: "cancel" });
     const request: InputRequest = {
       id: crypto.randomUUID(),
       server,
       message,
       requestedSchema,
       respond: (result) => {
+        signal?.removeEventListener("abort", cancel);
         queue.set(queue.get().filter((entry) => entry !== request));
         resolve(result);
       },
     };
     queue.set([...queue.get(), request]);
+    signal?.addEventListener("abort", cancel, { once: true });
   });
 }
 

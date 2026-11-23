@@ -39,6 +39,35 @@ export function toolServer(metadata: Tool["metadata"]) {
   return metadata?.[urlKey];
 }
 
+// Servers ask for input only while handling a request, so the input requests that arrive
+// while tool calls of the server run end with the last of these calls, such as when a chat is left.
+const runningCalls = new Map<string, { count: number; ended: AbortController }>();
+
+function trackCalls(url: string, tool: Tool): Tool {
+  const { execute } = tool;
+  return {
+    ...tool,
+    execute:
+      execute &&
+      (async (input, options) => {
+        const calls = runningCalls.get(url) ?? { count: 0, ended: new AbortController() };
+        calls.count += 1;
+        runningCalls.set(url, calls);
+
+        try {
+          return await execute(input, options);
+        } finally {
+          calls.count -= 1;
+
+          if (calls.count === 0) {
+            runningCalls.delete(url);
+            calls.ended.abort();
+          }
+        }
+      }),
+  };
+}
+
 async function connect(url: string): Promise<MCPClient> {
   const client = await createMCPClient({
     // a restarted server forgets its sessions, so the next use connects again
@@ -48,7 +77,7 @@ async function connect(url: string): Promise<MCPClient> {
     initializationOptions: requestOptions,
   });
   client.onElicitationRequest(ElicitationRequestSchema, (request) =>
-    requestInput(new URL(url).host, request.params),
+    requestInput(new URL(url).host, request.params, runningCalls.get(url)?.ended.signal),
   );
   return client;
 }
@@ -96,7 +125,7 @@ async function listTools(url: string): Promise<ToolListing> {
       Object.entries(mcp.toolsFromDefinitions(definitions)).map(([name, tool]) => [
         name,
         // the calls record the server's URL, which binds their approval to the server
-        mcpContentTool({ ...tool, metadata: { ...tool.metadata, [urlKey]: url } }),
+        mcpContentTool(trackCalls(url, { ...tool, metadata: { ...tool.metadata, [urlKey]: url } })),
       ]),
     ),
     readOnly: new Set(
