@@ -87,6 +87,8 @@ export function canSignOut(connection: Connection): boolean {
 async function openSession(connection: Connection): Promise<Session> {
   const response = await fetch(new URL("models", connection.baseURL), {
     headers: connection.apiKey ? { Authorization: `Bearer ${connection.apiKey}` } : {},
+    // bounded, so that a server that never answers cannot stall the startup
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (response.status === 401 || response.status === 403) {
