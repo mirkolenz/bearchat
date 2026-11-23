@@ -116,7 +116,11 @@ function webApp(): Plugin {
     },
     transformIndexHtml: () => [
       { tag: "link", injectTo: "head", attrs: { rel: "manifest", href: "manifest.json" } },
-      { tag: "link", injectTo: "head", attrs: { rel: "apple-touch-icon", href: `icon-${largest}.png` } },
+      {
+        tag: "link",
+        injectTo: "head",
+        attrs: { rel: "apple-touch-icon", href: `icon-${largest}.png` },
+      },
     ],
   };
 }
