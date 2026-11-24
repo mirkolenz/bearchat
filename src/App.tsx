@@ -15,7 +15,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { config } from "@/lib/config";
 import { canSignOut, type Session } from "@/lib/connection";
 import { openThread, type Route, usePage } from "@/lib/route";
+import { useUserSettings } from "@/lib/settings";
 import { useThreads } from "@/lib/threads";
+import { preloadPython } from "@/lib/tools/python";
 import { errorMessage } from "@/lib/utils";
 import type { Startup } from "@/start";
 
@@ -41,6 +43,14 @@ export function renderApp(container: HTMLElement, startup: Startup) {
 
 function App({ startup }: { startup: Startup }) {
   const [session, setSession] = useState(startup.session);
+  const { pythonTool } = useUserSettings();
+
+  // If new chats offer Python, Monty loads during sign-in and while the first message is written.
+  useEffect(() => {
+    if (pythonTool) {
+      preloadPython();
+    }
+  }, [pythonTool]);
 
   return (
     <>

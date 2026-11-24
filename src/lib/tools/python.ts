@@ -143,10 +143,12 @@ function runPython(
   });
 }
 
-// starts loading Monty while the model writes the input, a failure is reported by execute
-const preload = () => void montyPool().catch(() => undefined);
+/** Starts loading Monty before the first run needs it, a failure is reported by that run. */
+export const preloadPython = () => void montyPool().catch(() => undefined);
 
 export function createPythonTools(files: boolean, threadId: string): ToolSet {
+  // retries a failed preload of App before the model writes code
+  preloadPython();
   const fileCalls = files ? pythonFileCalls : new Map<string, FileCall>();
 
   const run_python = tool({
@@ -163,7 +165,6 @@ export function createPythonTools(files: boolean, threadId: string): ToolSet {
           "which run once per chat and are not reloaded after changes."
         : "It has no files."),
     inputSchema: z.object({ code: z.string().describe("Python source code to run") }),
-    onInputStart: preload,
     execute: ({ code }) => runPython(threadId, fileCalls, () => code),
   });
 
@@ -181,7 +182,6 @@ export function createPythonTools(files: boolean, threadId: string): ToolSet {
       inputSchema: z.object({
         name: z.string().describe("Python file name without directories, such as script.py"),
       }),
-      onInputStart: preload,
       execute: ({ name }) => runPython(threadId, fileCalls, () => readFile(name)),
     }),
   };
