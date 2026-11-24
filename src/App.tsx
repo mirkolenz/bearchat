@@ -17,7 +17,7 @@ import { canSignOut, type Session } from "@/lib/connection";
 import { openThread, type Route, usePage } from "@/lib/route";
 import { useUserSettings } from "@/lib/settings";
 import { useThreads } from "@/lib/threads";
-import { preloadPython } from "@/lib/tools/python";
+import { preloadTools } from "@/lib/tools";
 import { errorMessage } from "@/lib/utils";
 import type { Startup } from "@/start";
 
@@ -43,14 +43,10 @@ export function renderApp(container: HTMLElement, startup: Startup) {
 
 function App({ startup }: { startup: Startup }) {
   const [session, setSession] = useState(startup.session);
-  const { pythonTool } = useUserSettings();
+  const settings = useUserSettings();
 
-  // If new chats offer Python, Monty loads during sign-in and while the first message is written.
-  useEffect(() => {
-    if (pythonTool) {
-      preloadPython();
-    }
-  }, [pythonTool]);
+  // loads during sign-in and while the first message is written
+  useEffect(() => preloadTools(settings), [settings]);
 
   return (
     <>

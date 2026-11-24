@@ -4,7 +4,14 @@ import { type ServerErrorHandler, serverTools } from "@/lib/mcp";
 import type { Settings } from "@/lib/settings";
 import { createChatTools } from "@/lib/tools/chats";
 import { fileTools } from "@/lib/tools/files";
-import { createPythonTools } from "@/lib/tools/python";
+import { createPythonTools, preloadPython } from "@/lib/tools/python";
+
+/** Starts loading the large tools that new chats offer, so that their first use does not wait for them. */
+export function preloadTools(settings: Settings) {
+  if (settings.pythonTool) {
+    preloadPython();
+  }
+}
 
 /** Collects the enabled tools, the names of those that run without approval, and the servers' instructions. */
 export async function createTools(
