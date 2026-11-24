@@ -64,6 +64,8 @@ runCommand "bearchat-caddy-test"
       get --request POST --header "X-BearChat-Token: $token" --output /dev/null "$@" http://localhost:8080/chat/auth/login
     }
     models() { curl --silent --header "Sec-Fetch-Site: $1" --header 'Cookie: __Host-bearchat=secret; other=1' http://localhost:8080/v1/models; }
+    encoding() { curl --silent --header 'Accept-Encoding: br, gzip' --output /dev/null --write-out '%header{content-encoding} %header{cache-control}' "http://localhost:8080/chat/$1"; }
+    wasm=$(cd ${system.config.services.bearchat.package}/assets && echo monty.component.core-*.wasm)
 
     get http://localhost:8080/chat/config.json | jq --exit-status '.auth == "cookie"'
     test "$(login secret --write-out '%header{set-cookie}')" = '__Host-bearchat=secret; Max-Age=43200; Path=/; Secure; HttpOnly; SameSite=Strict'
@@ -71,6 +73,8 @@ runCommand "bearchat-caddy-test"
     test "$(curl --silent --request POST --header 'Sec-Fetch-Site: cross-site' --header 'X-BearChat-Token: secret' --output /dev/null --write-out '%{http_code}' http://localhost:8080/chat/auth/login)" = 400
     test "$(models same-origin)" = 'Bearer secret|'
     test "$(models cross-site)" = ""
+    test "$(encoding)" = 'br no-store'
+    test "$(encoding "assets/$wasm")" = 'br public, max-age=31536000, immutable'
 
     kill $caddy
     touch $out

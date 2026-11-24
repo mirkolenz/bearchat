@@ -128,17 +128,15 @@ in
             header {
               -ETag
               -Last-Modified
+              ?Cache-Control "no-store"
               Content-Security-Policy "frame-ancestors 'none'"
               Cross-Origin-Opener-Policy same-origin
               X-Content-Type-Options nosniff
             }
-            handle /assets/* {
-              header Cache-Control "public, max-age=31536000, immutable"
-              file_server
-            }
-            handle {
-              header Cache-Control "no-store"
-              file_server
+            header /assets/* Cache-Control "public, max-age=31536000, immutable"
+            # the Brotli files of the build, others such as config.json are compressed by encode
+            file_server {
+              precompressed br
             }
           }
         }

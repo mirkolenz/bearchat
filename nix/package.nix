@@ -5,6 +5,8 @@
   importNpmLock,
   formats,
   runCommand,
+  compressDrvWeb,
+  brotli,
   # written to config.json, see the README for the available options
   settings ? { },
 }:
@@ -47,9 +49,15 @@ let
       maintainers = with lib.maintainers; [ mirkolenz ];
     };
   });
+  # Brotli copies for servers such as Caddy with `precompressed br`,
+  # leaving out the default gzip, which takes minutes for the WebAssembly of the Python tool.
+  compressed = compressDrvWeb dist {
+    extraFormats = [ "wasm" ];
+    compressors.br = "${lib.getExe brotli} --keep --no-copy-stat {}";
+  };
   configFile = (formats.json { }).generate "config.json" settings;
 in
 runCommand dist.name { inherit (dist) meta; } ''
-  cp -rs --no-preserve=mode ${dist} "$out"
+  cp -rs --no-preserve=mode ${compressed} "$out"
   cp ${configFile} "$out/config.json"
 ''
