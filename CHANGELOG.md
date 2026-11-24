@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.4](https://github.com/mirkolenz/bearchat/compare/v1.0.3...v1.0.4) (2026-11-24)
+
+### Performance Improvements
+
+* **convert:** preload document converter once files are about to be added ([23f791d](https://github.com/mirkolenz/bearchat/commit/23f791db17099f7ee17fd9e86aecdabd6a1eac2c))
+* **nix:** serve build precompressed with brotli ([ce15ecf](https://github.com/mirkolenz/bearchat/commit/ce15ecfca8dd4abfd56776c4da90b66f4ff9fed0))
+* **python:** preload sandbox at app start ([70e9d37](https://github.com/mirkolenz/bearchat/commit/70e9d3793ce695a3439f1cabe7432fcc33dd924a))
+
 ## [1.0.3](https://github.com/mirkolenz/bearchat/compare/v1.0.2...v1.0.3) (2026-11-23)
 
 ### Bug Fixes
