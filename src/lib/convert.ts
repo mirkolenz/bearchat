@@ -9,11 +9,26 @@ const maxImageSide = 2048;
 // started on first use and kept, so that anydoc, whose WebAssembly build is large, loads once
 let documentWorker: Worker | undefined;
 
+function documentConverter(): Worker {
+  if (documentWorker === undefined) {
+    const worker = new Worker(new URL("./convert-worker.ts", import.meta.url), { type: "module" });
+    // a worker that failed to load is replaced on the next use, also if no conversion was waiting
+    worker.addEventListener("error", () => {
+      worker.terminate();
+      documentWorker = undefined;
+    });
+    documentWorker = worker;
+  }
+
+  return documentWorker;
+}
+
+/** Starts loading the document converter once the user is about to add files, which it may have to convert. */
+export const preloadConverter = () => void documentConverter();
+
 /** Converts a document to Markdown in the worker. */
 async function convertDocument(bytes: Uint8Array<ArrayBuffer>): Promise<DocumentResult> {
-  const worker = (documentWorker ??= new Worker(new URL("./convert-worker.ts", import.meta.url), {
-    type: "module",
-  }));
+  const worker = documentConverter();
   const { port1, port2 } = new MessageChannel();
   const done = new AbortController();
 

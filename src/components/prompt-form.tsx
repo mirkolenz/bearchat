@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/input-group";
 import { storeFile } from "@/lib/blobs";
 import type { Model } from "@/lib/connection";
+import { preloadConverter } from "@/lib/convert";
 import { enabledServers, type PromptMessages } from "@/lib/mcp";
 import { hasHardwareKeyboard, isTouchScreen } from "@/lib/pointer";
 import { lockedSettings, type ResolvedSettings, type Settings } from "@/lib/settings";
@@ -129,6 +130,7 @@ export function PromptForm({
     const allow = (event: DragEvent) => {
       if (event.dataTransfer?.types.includes("Files")) {
         event.preventDefault();
+        preloadConverter();
       }
     };
     const handle = (event: DragEvent) => drop(event);
@@ -297,6 +299,7 @@ export function PromptForm({
             type="file"
             multiple
             hidden
+            onClick={preloadConverter}
             onChange={(event) => {
               void addFiles(event.target.files);
               event.target.value = "";

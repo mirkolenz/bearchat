@@ -25,7 +25,7 @@ import {
   SidebarMenuItem,
   SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
-import { dataURL, imageFormat, isImageName } from "@/lib/convert";
+import { dataURL, imageFormat, isImageName, preloadConverter } from "@/lib/convert";
 import { addFile, deleteFiles, watchFiles } from "@/lib/files";
 import { downloadFile, formatTime } from "@/lib/utils";
 
@@ -77,6 +77,7 @@ export function FilesPanel() {
           type="file"
           multiple
           hidden
+          onClick={preloadConverter}
           onChange={(event) => {
             void upload(event.target.files ?? []);
             event.target.value = "";

@@ -7,6 +7,8 @@ import { errorMessage, lazy } from "@/lib/utils";
 export type DocumentResult = { markdown: string } | { unsupported: true } | { error: string };
 
 const ready = lazy(() => init());
+// loads anydoc as soon as the worker starts, a failure is reported by the next conversion
+void ready().catch(() => undefined);
 
 self.addEventListener("message", async ({ data, ports: [port] }: MessageEvent<Uint8Array>) => {
   let result: DocumentResult;
