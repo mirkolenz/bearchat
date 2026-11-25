@@ -15,6 +15,8 @@ let
   maxAge = lib.optionalString (
     cfg.sessionDuration != null
   ) "Max-Age=${toString cfg.sessionDuration}; ";
+  # a leading slash without a trailing one, empty for the root
+  normalizePath = path: lib.removeSuffix "/" (lib.strings.normalizePath "/${path}");
 in
 {
   options.services.bearchat = {
@@ -31,10 +33,11 @@ in
       description = "Caddy virtual host that serves BearChat, created if it does not exist yet.";
     };
     path = mkOption {
-      type = types.strMatching "(/[^/]+)*";
-      default = "";
+      type = types.str;
+      default = "/";
       example = "/chat";
-      description = "URL path of BearChat without a trailing slash, empty for the root.";
+      apply = normalizePath;
+      description = "URL path of BearChat, such as `/chat`.";
     };
     redirectRoot = lib.mkEnableOption "redirecting `GET` and `HEAD` requests of the root to `path`, while other methods pass through to an API served at the root such as llmhop";
     upstream = mkOption {
@@ -54,8 +57,9 @@ in
       description = "Seconds until the session cookie expires, `null` keeps it until the browser closes.";
     };
     apiPath = mkOption {
-      type = types.strMatching "(/[^/]+)+";
+      type = types.str;
       default = "/v1";
+      apply = normalizePath;
       description = "URL path of the API proxied to `upstream`, which is forwarded unchanged.";
     };
     settings = mkOption {
@@ -77,6 +81,10 @@ in
       {
         assertion = cfg.redirectRoot -> cfg.path != "";
         message = "services.bearchat.redirectRoot requires services.bearchat.path to be other than the root.";
+      }
+      {
+        assertion = cfg.apiPath != "";
+        message = "services.bearchat.apiPath must be other than the root.";
       }
     ];
 
