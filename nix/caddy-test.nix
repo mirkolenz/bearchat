@@ -69,7 +69,7 @@ runCommand "bearchat-caddy-test"
     wasm=$(cd ${system.config.services.bearchat.package}/assets && echo monty.component.core-*.wasm)
 
     test "$(curl --silent --output /dev/null --write-out '%{http_code} %{redirect_url}' http://localhost:8080/)" = '302 http://localhost:8080/chat/'
-    test "$(curl --silent --request POST --output /dev/null --write-out '%{http_code}' http://localhost:8080/)" = 404
+    test "$(curl --silent --request POST --output /dev/null --write-out '%{http_code} %{redirect_url}' http://localhost:8080/)" = '200 '
     get http://localhost:8080/chat/config.json | jq --exit-status '.auth == "cookie"'
     test "$(login secret --write-out '%header{set-cookie}')" = '__Host-bearchat=secret; Max-Age=43200; Path=/; Secure; HttpOnly; SameSite=Strict'
     test "$(login wrong --write-out '%{http_code}')" = 401
