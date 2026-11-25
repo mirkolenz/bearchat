@@ -156,7 +156,11 @@ in
               Cross-Origin-Opener-Policy same-origin
               X-Content-Type-Options nosniff
             }
-            header /assets/* Cache-Control "public, max-age=31536000, immutable"
+            # only successful responses, a missing chunk of another build must not be cached
+            header /assets/* {
+              Cache-Control "public, max-age=31536000, immutable"
+              match status 2xx
+            }
             # the Brotli files of the build, others such as config.json are compressed by encode
             file_server {
               precompressed br

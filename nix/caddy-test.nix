@@ -78,6 +78,7 @@ runCommand "bearchat-caddy-test"
     test "$(models cross-site)" = ""
     test "$(encoding)" = 'br no-store'
     test "$(encoding "assets/$wasm")" = 'br public, max-age=31536000, immutable'
+    test "$(encoding assets/missing.js)" = ' no-store'
 
     kill $caddy
     touch $out
