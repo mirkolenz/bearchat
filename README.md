@@ -109,7 +109,7 @@ The NixOS module sets this up, for example next to llmhop:
     enable = true;
     virtualHost = "example.org";
     path = "/chat";
-    upstream = "unix/${config.services.llmhop.gateway.llmhop.listen.caddy.socket}";
+    upstream = "unix/${config.services.llmhop.gateway.listen.default.socket}";
   };
 }
 ```

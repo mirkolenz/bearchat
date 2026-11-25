@@ -39,7 +39,7 @@ in
     upstream = mkOption {
       type = with types; nullOr str;
       default = null;
-      example = lib.literalExpression ''"unix/''${config.services.llmhop.gateway.llmhop.listen.caddy.socket}"'';
+      example = lib.literalExpression ''"unix/''${config.services.llmhop.gateway.listen.default.socket}"'';
       description = ''
         Caddy upstream of an OpenAI-compatible API such as llmhop, served under `apiPath`.
         If set, BearChat uses this API and Caddy stores the user's token in an `HttpOnly` cookie
