@@ -1,6 +1,10 @@
 // Formats that are persisted or read from outside, kept free of other imports so the build can publish them as JSON Schema.
 import { z } from "zod";
 
+// Zod probes for eval to compile parsers, which the Content-Security-Policy blocks and reports.
+// The setting is global, and the config loads this module before anything is parsed.
+z.config({ jitless: true });
+
 /** Parses a JSON string, so that it can be piped into a schema of the expected shape. */
 export const jsonSchema = z.string().transform((text, context): unknown => {
   try {
