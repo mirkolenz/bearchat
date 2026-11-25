@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.6](https://github.com/mirkolenz/bearchat/compare/v1.0.5...v1.0.6) (2026-11-25)
+
+### Bug Fixes
+
+* disable zod jit to avoid csp eval violation ([2a908d8](https://github.com/mirkolenz/bearchat/commit/2a908d8af9839214458e13151f282f22a0e99aaa))
+
 ## [1.0.5](https://github.com/mirkolenz/bearchat/compare/v1.0.4...v1.0.5) (2026-11-25)
 
 ### Bug Fixes
