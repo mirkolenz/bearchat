@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.7](https://github.com/mirkolenz/bearchat/compare/v1.0.6...v1.0.7) (2026-11-25)
+
+### Bug Fixes
+
+* **nix:** cache only successful asset responses ([133126d](https://github.com/mirkolenz/bearchat/commit/133126d1785153f5862206289011f4d7ee5f7a21))
+* **nix:** keep headers on missing asset responses ([78e58bc](https://github.com/mirkolenz/bearchat/commit/78e58bcf4883a27bd1ae5351f94c970b3f481811))
+* reload once when chunks of previous build are missing ([aded8e9](https://github.com/mirkolenz/bearchat/commit/aded8e9b65feb7100aff6e93bde522f40222c4d4))
+
 ## [1.0.6](https://github.com/mirkolenz/bearchat/compare/v1.0.5...v1.0.6) (2026-11-25)
 
 ### Bug Fixes
