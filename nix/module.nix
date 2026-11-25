@@ -161,9 +161,14 @@ in
               Cache-Control "public, max-age=31536000, immutable"
               match status 2xx
             }
-            # the Brotli files of the build, others such as config.json are compressed by encode
-            file_server {
-              precompressed br
+            route {
+              # the Brotli files of the build, others such as config.json are compressed by encode
+              file_server {
+                precompressed br
+                pass_thru
+              }
+              # unlike an error of file_server, this response keeps the headers above
+              respond 404
             }
           }
         }
