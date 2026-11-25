@@ -36,6 +36,7 @@ in
       example = "/chat";
       description = "URL path of BearChat without a trailing slash, empty for the root.";
     };
+    redirectRoot = lib.mkEnableOption "redirecting `GET` and `HEAD` requests of the root to `path`, while other methods pass through to an API served at the root such as llmhop";
     upstream = mkOption {
       type = with types; nullOr str;
       default = null;
@@ -72,6 +73,13 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.redirectRoot -> cfg.path != "";
+        message = "services.bearchat.redirectRoot requires services.bearchat.path to be other than the root.";
+      }
+    ];
+
     services.bearchat.settings = lib.mkIf proxied {
       baseURL = cfg.apiPath;
       auth = "cookie";
@@ -81,6 +89,13 @@ in
       enable = lib.mkDefault true;
       virtualHosts.${cfg.virtualHost}.extraConfig = ''
         ${lib.optionalString (cfg.path != "") "redir ${cfg.path} ${cfg.path}/"}
+        ${lib.optionalString cfg.redirectRoot ''
+          @bearchat_root {
+            method GET HEAD
+            path /
+          }
+          redir @bearchat_root ${cfg.path}/
+        ''}
         handle_path ${cfg.path}/* {
           ${lib.optionalString proxied ''
             @bearchat_login {

@@ -109,6 +109,7 @@ The NixOS module sets this up, for example next to llmhop:
     enable = true;
     virtualHost = "example.org";
     path = "/chat";
+    redirectRoot = true;
     upstream = "unix/${config.services.llmhop.gateway.listen.default.socket}";
   };
 }
