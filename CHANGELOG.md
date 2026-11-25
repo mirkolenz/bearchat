@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/mirkolenz/bearchat/compare/v1.0.4...v1.0.5) (2026-11-25)
+
+### Bug Fixes
+
+* **nix:** add option to redirect the root to bearchat ([4a3e8df](https://github.com/mirkolenz/bearchat/commit/4a3e8dfc996d464673c23018806edd1cf03020ce))
+* **nix:** normalize slashes of path options ([628bb43](https://github.com/mirkolenz/bearchat/commit/628bb43144e2e70c5019329e2c54dba9cf36d460))
+
 ## [1.0.4](https://github.com/mirkolenz/bearchat/compare/v1.0.3...v1.0.4) (2026-11-24)
 
 ### Performance Improvements
