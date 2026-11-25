@@ -23,7 +23,7 @@
         treefmt = config.treefmt.build.wrapper;
       };
       checks = config.packages // {
-        caddy = pkgs.callPackage ./caddy-test.nix { module = self.nixosModules.default; };
+        nixos = pkgs.callPackage ./test.nix { module = self.nixosModules.default; };
       };
       packages.default = pkgs.callPackage ./package.nix { };
       treefmt = {
