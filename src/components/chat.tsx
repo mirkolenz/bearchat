@@ -1,9 +1,10 @@
 import { useChat } from "@ai-sdk/react";
 import { type FileUIPart, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
-import { MessageSquareIcon } from "lucide-react";
+import { GhostIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ChatMessageView } from "@/components/chat-message";
+import { Logo } from "@/components/logo";
 import { PromptForm } from "@/components/prompt-form";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -194,8 +195,12 @@ export function Thread({
               {messages.length === 0 && (
                 <Empty className="flex-1">
                   <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <MessageSquareIcon />
+                    <EmptyMedia className="size-16">
+                      {temporary ? (
+                        <GhostIcon className="size-full text-muted-foreground" strokeWidth={1.5} />
+                      ) : (
+                        <Logo className="size-full" />
+                      )}
                     </EmptyMedia>
                     <EmptyTitle>{temporary ? "Temporary chat" : config.title}</EmptyTitle>
                     <EmptyDescription>

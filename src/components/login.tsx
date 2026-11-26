@@ -35,10 +35,9 @@ export function Login({ error: initialError, onSignIn }: LoginProps) {
   }, initialError);
 
   return (
-    <CenteredPage>
+    <CenteredPage title={config.title}>
       <form action={submit}>
         <FieldGroup>
-          <h1 className="text-2xl font-semibold">{config.title}</h1>
           {config.baseURL === undefined && (
             <Field>
               <FieldLabel htmlFor="base-url">Server URL</FieldLabel>

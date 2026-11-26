@@ -8,10 +8,11 @@ import { errorMessage } from "@/lib/utils";
 
 export function renderStartupFailure(container: HTMLElement, error: unknown) {
   createRoot(container).render(
-    <CenteredPage>
+    // the config may be what failed to load, so its title is out of reach
+    <CenteredPage title="BearChat">
       <FieldGroup>
         <Alert variant="destructive">
-          <AlertTitle>BearChat failed to start</AlertTitle>
+          <AlertTitle>Failed to start</AlertTitle>
           <AlertDescription className="whitespace-pre-line wrap-anywhere">
             {errorMessage(error)}
           </AlertDescription>

@@ -13,6 +13,7 @@ import { flushSync } from "react-dom";
 import { DeleteMenuItem } from "@/components/delete-menu-item";
 import { DialogBody, DialogPanel } from "@/components/dialog-panel";
 import { FilesPanel } from "@/components/files-panel";
+import { Logo } from "@/components/logo";
 import { SelectableGroupLabel, SelectionItem, useSelection } from "@/components/selection";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { SidebarItemMenu } from "@/components/sidebar-item-menu";
@@ -92,6 +93,10 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
         className="min-h-0 flex-1 gap-0 pt-safe-0 pl-safe-0"
       >
         <SidebarHeader>
+          <div className="flex h-8 items-center gap-2 px-2 font-semibold">
+            <Logo className="size-6" />
+            {config.title}
+          </div>
           <TabsList className="w-full">
             <TabsTrigger value="chats">Chats</TabsTrigger>
             <TabsTrigger value="files">Files</TabsTrigger>
@@ -141,7 +146,7 @@ export function AppSidebar({ canSignOut }: { canSignOut: boolean }) {
           <SidebarContent>
             <SidebarGroup>
               <SelectableGroupLabel
-                label={config.title}
+                label="Chats"
                 selection={selection}
                 action={{
                   label: "Export",
