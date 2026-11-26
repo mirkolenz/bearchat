@@ -155,8 +155,8 @@ export function createPythonTools(files: boolean, threadId: string): ToolSet {
     description:
       "Run Python code in an isolated sandbox and return the value of the last expression and the printed output. " +
       "Variables, functions and imported modules persist across the runs of this chat. " +
-      "It supports a subset of Python 3.14 with modules such as json, math, re, datetime, decimal, csv and base64, " +
-      "but no third-party packages or network access, " +
+      "It supports a subset of Python 3.14 with modules such as json, math, statistics, re, datetime, decimal, csv " +
+      "and base64, but no third-party packages or network access, " +
       `and each run is limited to ${limits.maxFeedDurationSecs} seconds, ${limits.maxMemory / 1_000_000} MB of memory ` +
       `and ${maxOutputBytes / 1_000} kB of printed output. ` +
       (files
