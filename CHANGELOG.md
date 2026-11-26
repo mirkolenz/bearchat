@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.8](https://github.com/mirkolenz/bearchat/compare/v1.0.7...v1.0.8) (2026-11-26)
+
+### Bug Fixes
+
+* **python:** mention statistics module in tool description ([56892e1](https://github.com/mirkolenz/bearchat/commit/56892e1d2a1033ec60729847f8c7d090fb7af1d3))
+* show logo on login, failure page, sidebar and empty chat ([65a17ee](https://github.com/mirkolenz/bearchat/commit/65a17eebac9fb5a6ac402c7ae5a926ddad5e7f9c))
+
 ## [1.0.7](https://github.com/mirkolenz/bearchat/compare/v1.0.6...v1.0.7) (2026-11-25)
 
 ### Bug Fixes
